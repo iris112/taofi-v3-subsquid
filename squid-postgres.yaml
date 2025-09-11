@@ -1,0 +1,67 @@
+# =======================
+# PostgreSQL (StatefulSet + Service)
+# =======================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: squid-postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squid-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squid-postgres
+  template:
+    metadata:
+      labels:
+        app: squid-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: squid
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: postgres
+        ports:
+        - containerPort: 5432
+        resources:
+          limits:
+            memory: "2Gi"
+          requests:
+            memory: "1Gi"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data1
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: squid-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: squid-postgres
+spec:
+  type: NodePort           # allows external access
+  selector:
+    app: squid-postgres
+  ports:
+  - name: postgres
+    protocol: TCP
+    port: 5432             # internal cluster port
+    targetPort: 5432
+    nodePort: 30798        # external node port mapping

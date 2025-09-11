@@ -38,5 +38,5 @@ tasks:
       gp open src/processor.ts
       gp sync-await setup
       sqd build
-      gp ports await 23798
+      gp ports await 30798
       sqd process

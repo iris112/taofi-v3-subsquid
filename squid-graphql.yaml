@@ -1,0 +1,46 @@
+# =======================
+# GraphQL server
+# =======================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squid-graphql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squid-graphql
+  template:
+    metadata:
+      labels:
+        app: squid-graphql
+    spec:
+      containers:
+      - name: graphql
+        image: us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql:latest
+        ports:
+        - containerPort: 4350
+        env:
+        - name: DB_HOST
+          value: squid-postgres
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASS
+          value: postgres
+        - name: DB_NAME
+          value: squid
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: squid-graphql-service
+spec:
+  selector:
+    app: squid-graphql
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 4350
+  type: LoadBalancer
