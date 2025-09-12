@@ -13,6 +13,7 @@ import {
   PoolDayData,
   PoolHourData,
   Position,
+  PositionSnapshot,
   Swap,
   Tick,
   TickDayData,
@@ -48,4 +49,5 @@ processor.run(new TypeormDatabase(), async (ctx) => {
   await ctx.store.save(entities.values(TokenHourData));
   await ctx.store.save(entities.values(TickDayData)); //
   await ctx.store.save(entities.values(Position));
+  await ctx.store.save(entities.values(PositionSnapshot));
 });

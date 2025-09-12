@@ -1,17 +1,14 @@
 import { BigDecimal } from "@subsquid/big-decimal";
 
 import {
-  BatchBlock,
   BlockHandlerContext,
-  CommonHandlerContext,
-  LogHandlerContext,
   LogItem,
   TransactionItem,
   BlockHeader,
 } from "../utils/interfaces/interfaces";
 
 import { Multicall } from "../abi/multicall";
-import { Position, PositionSnapshot, Token } from "../model";
+import { Position, PositionSnapshot, Token, Tx } from "../model";
 import { BlockMap } from "../utils/blockMap";
 import {
   ADDRESS_ZERO,
@@ -46,7 +43,6 @@ export async function processPositions(
   if (!eventsData || eventsData.size == 0) return;
 
   await prefetch(ctx, eventsData, last(blocks).header);
-  // console.log(eventsData);
   for (const [block, blockEventsData] of eventsData) {
     for (const data of blockEventsData) {
       switch (data.type) {
@@ -65,8 +61,6 @@ export async function processPositions(
       }
     }
   }
-
-  // await updateFeeVars(createContext(last(blocks).header), ctx.entities.values(Position))
 }
 
 async function prefetch(
@@ -116,7 +110,7 @@ function processItems(blocks: BlockData[]) {
       };
       switch (log.topics[0]) {
         case positionsAbi.events.IncreaseLiquidity.topic: {
-          const data = processInreaseLiquidity(evmLog);
+          const data = processInreaseLiquidity(evmLog, log.transaction);
           eventsData.push(block.header, {
             type: "Increase",
             ...data,
@@ -124,7 +118,7 @@ function processItems(blocks: BlockData[]) {
           break;
         }
         case positionsAbi.events.DecreaseLiquidity.topic: {
-          const data = processDecreaseLiquidity(evmLog);
+          const data = processDecreaseLiquidity(evmLog, log.transaction);
           eventsData.push(block.header, {
             type: "Decrease",
             ...data,
@@ -132,7 +126,7 @@ function processItems(blocks: BlockData[]) {
           break;
         }
         case positionsAbi.events.Collect.topic: {
-          const data = processCollect(evmLog);
+          const data = processCollect(evmLog, log.transaction);
           eventsData.push(block.header, {
             type: "Collect",
             ...data,
@@ -140,7 +134,7 @@ function processItems(blocks: BlockData[]) {
           break;
         }
         case positionsAbi.events.Transfer.topic: {
-          const data = processTransafer(evmLog);
+          const data = processTransafer(evmLog, log.transaction);
           eventsData.push(block.header, {
             type: "Transfer",
             ...data,
@@ -174,7 +168,19 @@ async function processIncreaseData(
   position.depositedToken0 = position.depositedToken0 + amount0;
   position.depositedToken1 = position.depositedToken1 + amount1;
 
-  updatePositionSnapshot(ctx, block, position.id);
+  let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
+  if (!transaction) {
+    transaction = new Tx({
+      id: data.transaction.hash,
+      blockNumber: block.height,
+      timestamp: new Date(block.timestamp),
+      gasUsed: data.transaction.gas,
+      gasPrice: data.transaction.gasPrice,
+    });
+    ctx.entities.add(transaction);
+  }
+
+  updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
 
 async function processDecreaseData(
@@ -200,7 +206,19 @@ async function processDecreaseData(
   position.withdrawnToken0 = position.depositedToken0 + amount0;
   position.withdrawnToken1 = position.depositedToken1 + amount1;
 
-  updatePositionSnapshot(ctx, block, position.id);
+  let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
+  if (!transaction) {
+    transaction = new Tx({
+      id: data.transaction.hash,
+      blockNumber: block.height,
+      timestamp: new Date(block.timestamp),
+      gasUsed: data.transaction.gas,
+      gasPrice: data.transaction.gasPrice,
+    });
+    ctx.entities.add(transaction);
+  }
+
+  updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
 
 async function processCollectData(
@@ -211,8 +229,6 @@ async function processCollectData(
   let position = ctx.entities.get(Position, data.tokenId, false);
   // position was not able to be fetched
   if (position == null) return;
-  //console.log("position", position);
-  //console.log(data);
   let token0 = ctx.entities.get(Token, position.token0Id, false);
   if (token0 == null) return;
   let amount0 = BigDecimal(data.amount0, token0.decimals).toNumber();
@@ -220,7 +236,19 @@ async function processCollectData(
   position.collectedFeesToken0 = position.collectedFeesToken0 + amount0;
   position.collectedFeesToken1 = position.collectedFeesToken1 + amount0;
 
-  updatePositionSnapshot(ctx, block, position.id);
+  let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
+  if (!transaction) {
+    transaction = new Tx({
+      id: data.transaction.hash,
+      blockNumber: block.height,
+      timestamp: new Date(block.timestamp),
+      gasUsed: data.transaction.gas,
+      gasPrice: data.transaction.gasPrice,
+    });
+    ctx.entities.add(transaction);
+  }
+
+  updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
 
 async function processTransferData(
@@ -235,13 +263,26 @@ async function processTransferData(
 
   position.owner = data.to;
 
-  updatePositionSnapshot(ctx, block, position.id);
+  let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
+  if (!transaction) {
+    transaction = new Tx({
+      id: data.transaction.hash,
+      blockNumber: block.height,
+      timestamp: new Date(block.timestamp),
+      gasUsed: data.transaction.gas,
+      gasPrice: data.transaction.gasPrice,
+    });
+    ctx.entities.add(transaction);
+  }
+  
+  updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
 
 async function updatePositionSnapshot(
   ctx: ContextWithEntityManager,
   block: BlockHeader,
-  positionId: string
+  positionId: string,
+  transcation: any
 ) {
   const position = ctx.entities.getOrFail(Position, positionId, false);
 
@@ -257,8 +298,9 @@ async function updatePositionSnapshot(
     ctx.entities.add(positionSnapshot);
   }
   positionSnapshot.owner = position.owner;
-  positionSnapshot.pool = position.pool;
+  positionSnapshot.poolId = position.poolId;
   positionSnapshot.positionId = positionId;
+  positionSnapshot.transactionId = transcation.hash;
   positionSnapshot.blockNumber = block.height;
   positionSnapshot.timestamp = new Date(block.timestamp);
   positionSnapshot.liquidity = position.liquidity;
@@ -268,6 +310,8 @@ async function updatePositionSnapshot(
   positionSnapshot.withdrawnToken1 = position.withdrawnToken1;
   positionSnapshot.collectedFeesToken0 = position.collectedFeesToken0;
   positionSnapshot.collectedFeesToken1 = position.collectedFeesToken1;
+  positionSnapshot.feeGrowthInside0LastX128 = position.feeGrowthInside0LastX128;
+  positionSnapshot.feeGrowthInside1LastX128 = position.feeGrowthInside0LastX128;
   return;
 }
 
@@ -305,6 +349,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
     token0Id: string;
     token1Id: string;
     fee: number;
+    feeGrowthInside0LastX128: bigint;
+    feeGrowthInside1LastX128: bigint;
   }[] = [];
   for (let i = 0; i < ids.length; i++) {
     const result = positionResults[i];
@@ -314,6 +360,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
         token0Id: result.value.token0.toLowerCase(),
         token1Id: result.value.token1.toLowerCase(),
         fee: result.value.fee,
+        feeGrowthInside0LastX128: result.value.feeGrowthInside0LastX128,
+        feeGrowthInside1LastX128: result.value.feeGrowthInside1LastX128,
       });
     }
   }
@@ -336,6 +384,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
     const position = createPosition(positionsData[i].positionId);
     position.token0Id = positionsData[i].token0Id;
     position.token1Id = positionsData[i].token1Id;
+    position.feeGrowthInside0LastX128 = positionsData[i].feeGrowthInside0LastX128;
+    position.feeGrowthInside1LastX128 = positionsData[i].feeGrowthInside1LastX128;
     position.poolId = poolIds[i].toLowerCase();
 
     // temp fix
@@ -348,47 +398,28 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
   return positions;
 }
 
-async function updateFeeVars(
-  ctx: BlockHandlerContext<Store>,
-  positions: Position[]
-) {
-  const multicall = new Multicall(ctx, MULTICALL_ADDRESS);
-
-  const positionResult = await multicall.tryAggregate(
-    positionsAbi.functions.positions,
-    POSITIONS_ADDRESS,
-    positions.map((p) => {
-      return { tokenId: BigInt(p.id) };
-    }),
-    MULTICALL_PAGE_SIZE
-  );
-
-  for (let i = 0; i < positions.length; i++) {
-    const result = positionResult[i];
-    if (result.success) {
-      positions[i].feeGrowthInside0LastX128 =
-        result.value.feeGrowthInside0LastX128;
-      positions[i].feeGrowthInside1LastX128 =
-        result.value.feeGrowthInside1LastX128;
-    }
-  }
-}
-
 function snapshotId(positionId: string, block: number) {
   return `${positionId}#${block}`;
 }
 
 interface IncreaseData {
+  transaction: { hash: string; gasPrice: bigint; from: string; gas: bigint };
   tokenId: string;
   amount0: bigint;
   amount1: bigint;
   liquidity: bigint;
 }
 
-function processInreaseLiquidity(log: EvmLog): IncreaseData {
+function processInreaseLiquidity(log: EvmLog, transaction: any): IncreaseData {
   const event = positionsAbi.events.IncreaseLiquidity.decode(log);
 
   return {
+    transaction: {
+      hash: transaction.hash,
+      gasPrice: transaction.gasPrice,
+      from: transaction.from,
+      gas: BigInt(transaction.gasUsed || 0),
+    },
     tokenId: event.tokenId.toString(),
     amount0: event.amount0,
     amount1: event.amount1,
@@ -397,16 +428,23 @@ function processInreaseLiquidity(log: EvmLog): IncreaseData {
 }
 
 interface DecreaseData {
+  transaction: { hash: string; gasPrice: bigint; from: string; gas: bigint };
   tokenId: string;
   amount0: bigint;
   amount1: bigint;
   liquidity: bigint;
 }
 
-function processDecreaseLiquidity(log: EvmLog): DecreaseData {
+function processDecreaseLiquidity(log: EvmLog, transaction: any): DecreaseData {
   const event = positionsAbi.events.DecreaseLiquidity.decode(log);
 
   return {
+    transaction: {
+      hash: transaction.hash,
+      gasPrice: transaction.gasPrice,
+      from: transaction.from,
+      gas: BigInt(transaction.gasUsed || 0),
+    },
     tokenId: event.tokenId.toString(),
     amount0: event.amount0,
     amount1: event.amount1,
@@ -415,15 +453,22 @@ function processDecreaseLiquidity(log: EvmLog): DecreaseData {
 }
 
 interface CollectData {
+  transaction: { hash: string; gasPrice: bigint; from: string; gas: bigint };
   tokenId: string;
   amount0: bigint;
   amount1: bigint;
 }
 
-function processCollect(log: EvmLog): CollectData {
+function processCollect(log: EvmLog, transaction: any): CollectData {
   const event = positionsAbi.events.Collect.decode(log);
 
   return {
+    transaction: {
+      hash: transaction.hash,
+      gasPrice: transaction.gasPrice,
+      from: transaction.from,
+      gas: BigInt(transaction.gasUsed || 0),
+    },
     tokenId: event.tokenId.toString(),
     amount0: event.amount0,
     amount1: event.amount1,
@@ -431,14 +476,21 @@ function processCollect(log: EvmLog): CollectData {
 }
 
 interface TransferData {
+  transaction: { hash: string; gasPrice: bigint; from: string; gas: bigint };
   tokenId: string;
   to: string;
 }
 
-function processTransafer(log: EvmLog): TransferData {
+function processTransafer(log: EvmLog, transaction: any): TransferData {
   const event = positionsAbi.events.Transfer.decode(log);
 
   return {
+    transaction: {
+      hash: transaction.hash,
+      gasPrice: transaction.gasPrice,
+      from: transaction.from,
+      gas: BigInt(transaction.gasUsed || 0),
+    },
     tokenId: event.tokenId.toString(),
     to: event.to.toLowerCase(),
   };

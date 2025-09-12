@@ -76,10 +76,8 @@ export async function processPairs(
   ctx: ContextWithEntityManager,
   blocks: BlockData[]
 ): Promise<void> {
-  //console.log("processPairs");
 
   let eventsData = await processItems(ctx, blocks);
-  //console.log("processPairs", eventsData);
   if (!eventsData || eventsData.size == 0) return;
 
   await prefetch(ctx, eventsData);
