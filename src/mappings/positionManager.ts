@@ -232,9 +232,12 @@ async function processCollectData(
   let token0 = ctx.entities.get(Token, position.token0Id, false);
   if (token0 == null) return;
   let amount0 = BigDecimal(data.amount0, token0.decimals).toNumber();
+  let token1 = ctx.entities.get(Token, position.token1Id, false);
+  if (token1 == null) return;
+  let amount1 = BigDecimal(data.amount1, token1.decimals).toNumber();
 
   position.collectedFeesToken0 = position.collectedFeesToken0 + amount0;
-  position.collectedFeesToken1 = position.collectedFeesToken1 + amount0;
+  position.collectedFeesToken1 = position.collectedFeesToken1 + amount1;
 
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
