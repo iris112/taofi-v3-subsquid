@@ -29,6 +29,7 @@ export class PositionSnapshot {
     @ManyToOne_(() => Position, {nullable: true})
     position!: Position
 
+    @Index_()
     @IntColumn_({nullable: false})
     blockNumber!: number
 

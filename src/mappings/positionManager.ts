@@ -176,6 +176,8 @@ async function processIncreaseData(
   position.liquidity = position.liquidity + data.liquidity;
   position.depositedToken0 = position.depositedToken0 + amount0;
   position.depositedToken1 = position.depositedToken1 + amount1;
+  position.lastUpdateBlockNumber = block.height;
+  position.lastUpdateTimestamp = new Date(block.timestamp);
 
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
@@ -212,8 +214,10 @@ async function processDecreaseData(
   let amount1 = BigDecimal(data.amount1, token1.decimals).toNumber();
 
   position.liquidity = position.liquidity - data.liquidity;
-  position.withdrawnToken0 = position.depositedToken0 + amount0;
-  position.withdrawnToken1 = position.depositedToken1 + amount1;
+  position.withdrawnToken0 = position.withdrawnToken0 + amount0;
+  position.withdrawnToken1 = position.withdrawnToken1 + amount1;
+  position.lastUpdateBlockNumber = block.height;
+  position.lastUpdateTimestamp = new Date(block.timestamp);
 
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
@@ -247,6 +251,8 @@ async function processCollectData(
 
   position.collectedFeesToken0 = position.collectedFeesToken0 + amount0;
   position.collectedFeesToken1 = position.collectedFeesToken1 + amount1;
+  position.lastUpdateBlockNumber = block.height;
+  position.lastUpdateTimestamp = new Date(block.timestamp);
 
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
@@ -274,6 +280,8 @@ async function processTransferData(
   if (position == null) return;
 
   position.owner = data.to;
+  position.lastUpdateBlockNumber = block.height;
+  position.lastUpdateTimestamp = new Date(block.timestamp);
 
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
@@ -340,6 +348,8 @@ function createPosition(positionId: string) {
   position.collectedFeesToken1 = 0;
   position.feeGrowthInside0LastX128 = 0n;
   position.feeGrowthInside1LastX128 = 0n;
+  position.lastUpdateBlockNumber = 0;
+  position.lastUpdateTimestamp = new Date(0);
 
   return position;
 }
@@ -454,6 +464,40 @@ async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: Enti
     // Assign tick references to position
     position.tickLower = tickLower;
     position.tickUpper = tickUpper;
+
+    // Create an initial snapshot for the new position
+    const initialSnapshot = new PositionSnapshot({ 
+      id: `${position.id}#${ctx.block.height}` 
+    });
+    initialSnapshot.owner = position.owner;
+    initialSnapshot.poolId = position.poolId;
+    initialSnapshot.positionId = position.id;
+    initialSnapshot.blockNumber = ctx.block.height;
+    initialSnapshot.timestamp = new Date(ctx.block.timestamp);
+    initialSnapshot.liquidity = position.liquidity;
+    initialSnapshot.depositedToken0 = position.depositedToken0;
+    initialSnapshot.depositedToken1 = position.depositedToken1;
+    initialSnapshot.withdrawnToken0 = position.withdrawnToken0;
+    initialSnapshot.withdrawnToken1 = position.withdrawnToken1;
+    initialSnapshot.collectedFeesToken0 = position.collectedFeesToken0;
+    initialSnapshot.collectedFeesToken1 = position.collectedFeesToken1;
+    initialSnapshot.feeGrowthInside0LastX128 = position.feeGrowthInside0LastX128;
+    initialSnapshot.feeGrowthInside1LastX128 = position.feeGrowthInside1LastX128;
+    
+    // Create a placeholder transaction for the initial snapshot
+    const placeholderTx = new Tx({
+      id: `${ctx.block.height}-${position.id}-init`,
+      blockNumber: ctx.block.height,
+      timestamp: new Date(ctx.block.timestamp),
+      gasUsed: 0n,
+      gasPrice: 0n,
+    });
+    
+    if (ctx.entities) {
+      ctx.entities.add(placeholderTx);
+      ctx.entities.add(initialSnapshot);
+    }
+    initialSnapshot.transactionId = placeholderTx.id;
 
     positions.push(position);
   }

@@ -1,4 +1,4 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_, IntColumn as IntColumn_, DateTimeColumn as DateTimeColumn_} from "@subsquid/typeorm-store"
 import {Pool} from "./pool.model"
 import {Token} from "./token.model"
 import {Tick} from "./tick.model"
@@ -70,4 +70,10 @@ export class Position {
 
     @BigIntColumn_({nullable: false})
     feeGrowthInside1LastX128!: bigint
+
+    @IntColumn_({nullable: false})
+    lastUpdateBlockNumber!: number
+
+    @DateTimeColumn_({nullable: false})
+    lastUpdateTimestamp!: Date
 }
