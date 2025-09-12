@@ -17,9 +17,20 @@ import * as factoryAbi from "./abi/factory";
 import * as poolAbi from "./abi/pool";
 import * as positionsAbi from "./abi/NonfungiblePositionManager";
 
+// Load environment variables (required)
+if (!process.env.ARCHIVE_GATEWAY_URL) {
+  throw new Error("ARCHIVE_GATEWAY_URL environment variable is required");
+}
+if (!process.env.RPC_ENDPOINT_URL) {
+  throw new Error("RPC_ENDPOINT_URL environment variable is required");
+}
+
+const ARCHIVE_GATEWAY_URL = process.env.ARCHIVE_GATEWAY_URL;
+const RPC_ENDPOINT_URL = process.env.RPC_ENDPOINT_URL;
+
 export const processor = new EvmBatchProcessor()
-  .setGateway("https://v2.archive.subsquid.io/network/bittensor-mainnet-evm")
-  .setRpcEndpoint("https://lb.nodies.app/v2/bittensor-archival?apikey=57df376a-db15-4d11-9d54-cfe47a200a15")
+  .setGateway(ARCHIVE_GATEWAY_URL)
+  .setRpcEndpoint(RPC_ENDPOINT_URL)
   .setFinalityConfirmation(75)
   .addLog({
     address: [FACTORY_ADDRESS],

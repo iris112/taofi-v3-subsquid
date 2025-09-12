@@ -1,5 +1,5 @@
-module.exports = class Data1757559091095 {
-    name = 'Data1757559091095'
+module.exports = class Data1757655595721 {
+    name = 'Data1757655595721'
 
     async up(db) {
         await db.query(`CREATE TABLE "factory" ("id" character varying NOT NULL, "pool_count" integer NOT NULL, "tx_count" integer NOT NULL, "total_volume_usd" numeric NOT NULL, "total_volume_eth" numeric NOT NULL, "total_fees_usd" numeric NOT NULL, "total_fees_eth" numeric NOT NULL, "untracked_volume_usd" numeric NOT NULL, "total_value_locked_usd" numeric NOT NULL, "total_value_locked_eth" numeric NOT NULL, "total_value_locked_usd_untracked" numeric NOT NULL, "total_value_locked_eth_untracked" numeric NOT NULL, "owner" text NOT NULL, CONSTRAINT "PK_1372e5a7d114a3fa80736ba66bb" PRIMARY KEY ("id"))`)
@@ -38,10 +38,12 @@ module.exports = class Data1757559091095 {
         await db.query(`CREATE TABLE "pool" ("id" character varying NOT NULL, "created_at_timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "created_at_block_number" integer NOT NULL, "token0_id" character varying NOT NULL, "token1_id" character varying NOT NULL, "fee_tier" integer NOT NULL, "liquidity" numeric NOT NULL, "sqrt_price" numeric NOT NULL, "fee_growth_global0_x128" numeric NOT NULL, "fee_growth_global1_x128" numeric NOT NULL, "token0_price" numeric NOT NULL, "token1_price" numeric NOT NULL, "tick" integer, "observation_index" numeric NOT NULL, "volume_token0" numeric NOT NULL, "volume_token1" numeric NOT NULL, "volume_usd" numeric NOT NULL, "untracked_volume_usd" numeric NOT NULL, "fees_usd" numeric NOT NULL, "tx_count" integer NOT NULL, "collected_fees_token0" numeric NOT NULL, "collected_fees_token1" numeric NOT NULL, "collected_fees_usd" numeric NOT NULL, "total_value_locked_token0" numeric NOT NULL, "total_value_locked_token1" numeric NOT NULL, "total_value_locked_eth" numeric NOT NULL, "total_value_locked_usd" numeric NOT NULL, "total_value_locked_usd_untracked" numeric NOT NULL, "liquidity_provider_count" numeric NOT NULL, CONSTRAINT "PK_db1bfe411e1516c01120b85f8fe" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_338531367ed63e3eb8e1939980" ON "pool" ("token0_id") `)
         await db.query(`CREATE INDEX "IDX_479321eabdd500587fddd0ee88" ON "pool" ("token1_id") `)
-        await db.query(`CREATE TABLE "position" ("id" character varying NOT NULL, "owner" text NOT NULL, "pool_id" character varying NOT NULL, "token0_id" character varying NOT NULL, "token1_id" character varying NOT NULL, "liquidity" numeric NOT NULL, "deposited_token0" numeric NOT NULL, "deposited_token1" numeric NOT NULL, "withdrawn_token0" numeric NOT NULL, "withdrawn_token1" numeric NOT NULL, "collected_fees_token0" numeric NOT NULL, "collected_fees_token1" numeric NOT NULL, "fee_growth_inside0_last_x128" numeric NOT NULL, "fee_growth_inside1_last_x128" numeric NOT NULL, CONSTRAINT "PK_b7f483581562b4dc62ae1a5b7e2" PRIMARY KEY ("id"))`)
+        await db.query(`CREATE TABLE "position" ("id" character varying NOT NULL, "owner" text NOT NULL, "pool_id" character varying NOT NULL, "token0_id" character varying NOT NULL, "token1_id" character varying NOT NULL, "liquidity" numeric NOT NULL, "deposited_token0" numeric NOT NULL, "deposited_token1" numeric NOT NULL, "withdrawn_token0" numeric NOT NULL, "withdrawn_token1" numeric NOT NULL, "collected_fees_token0" numeric NOT NULL, "collected_fees_token1" numeric NOT NULL, "fee_growth_inside0_last_x128" numeric NOT NULL, "fee_growth_inside1_last_x128" numeric NOT NULL, "tick_lower_id" character varying, "tick_upper_id" character varying, CONSTRAINT "PK_b7f483581562b4dc62ae1a5b7e2" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_128820371117dcf3915dc01ad3" ON "position" ("pool_id") `)
         await db.query(`CREATE INDEX "IDX_f230b92ea5e4bdf8bd6658c629" ON "position" ("token0_id") `)
         await db.query(`CREATE INDEX "IDX_32d393d9b4c15d1f3253445453" ON "position" ("token1_id") `)
+        await db.query(`CREATE INDEX "IDX_3c3dd58c6936a8b6019ccff494" ON "position" ("tick_lower_id") `)
+        await db.query(`CREATE INDEX "IDX_c8555d5e1109593ee5ebf6c699" ON "position" ("tick_upper_id") `)
         await db.query(`CREATE TABLE "position_snapshot" ("id" character varying NOT NULL, "owner" text NOT NULL, "pool_id" character varying NOT NULL, "position_id" character varying NOT NULL, "block_number" integer NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "liquidity" numeric NOT NULL, "deposited_token0" numeric NOT NULL, "deposited_token1" numeric NOT NULL, "withdrawn_token0" numeric NOT NULL, "withdrawn_token1" numeric NOT NULL, "collected_fees_token0" numeric NOT NULL, "collected_fees_token1" numeric NOT NULL, "transaction_id" character varying NOT NULL, "fee_growth_inside0_last_x128" numeric NOT NULL, "fee_growth_inside1_last_x128" numeric NOT NULL, CONSTRAINT "PK_1988663621abbe6aca0301178b8" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_016de40c4f8b13ccf15f9209b7" ON "position_snapshot" ("pool_id") `)
         await db.query(`CREATE INDEX "IDX_517394d79735819c6c0912d484" ON "position_snapshot" ("position_id") `)
@@ -79,6 +81,8 @@ module.exports = class Data1757559091095 {
         await db.query(`ALTER TABLE "position" ADD CONSTRAINT "FK_128820371117dcf3915dc01ad30" FOREIGN KEY ("pool_id") REFERENCES "pool"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "position" ADD CONSTRAINT "FK_f230b92ea5e4bdf8bd6658c6292" FOREIGN KEY ("token0_id") REFERENCES "token"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "position" ADD CONSTRAINT "FK_32d393d9b4c15d1f3253445453e" FOREIGN KEY ("token1_id") REFERENCES "token"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
+        await db.query(`ALTER TABLE "position" ADD CONSTRAINT "FK_3c3dd58c6936a8b6019ccff4947" FOREIGN KEY ("tick_lower_id") REFERENCES "tick"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
+        await db.query(`ALTER TABLE "position" ADD CONSTRAINT "FK_c8555d5e1109593ee5ebf6c6995" FOREIGN KEY ("tick_upper_id") REFERENCES "tick"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "position_snapshot" ADD CONSTRAINT "FK_016de40c4f8b13ccf15f9209b7b" FOREIGN KEY ("pool_id") REFERENCES "pool"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "position_snapshot" ADD CONSTRAINT "FK_517394d79735819c6c0912d4840" FOREIGN KEY ("position_id") REFERENCES "position"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
         await db.query(`ALTER TABLE "position_snapshot" ADD CONSTRAINT "FK_e7b0099f3c24660dd87abef310c" FOREIGN KEY ("transaction_id") REFERENCES "tx"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
@@ -129,6 +133,8 @@ module.exports = class Data1757559091095 {
         await db.query(`DROP INDEX "public"."IDX_128820371117dcf3915dc01ad3"`)
         await db.query(`DROP INDEX "public"."IDX_f230b92ea5e4bdf8bd6658c629"`)
         await db.query(`DROP INDEX "public"."IDX_32d393d9b4c15d1f3253445453"`)
+        await db.query(`DROP INDEX "public"."IDX_3c3dd58c6936a8b6019ccff494"`)
+        await db.query(`DROP INDEX "public"."IDX_c8555d5e1109593ee5ebf6c699"`)
         await db.query(`DROP TABLE "position_snapshot"`)
         await db.query(`DROP INDEX "public"."IDX_016de40c4f8b13ccf15f9209b7"`)
         await db.query(`DROP INDEX "public"."IDX_517394d79735819c6c0912d484"`)
@@ -166,6 +172,8 @@ module.exports = class Data1757559091095 {
         await db.query(`ALTER TABLE "position" DROP CONSTRAINT "FK_128820371117dcf3915dc01ad30"`)
         await db.query(`ALTER TABLE "position" DROP CONSTRAINT "FK_f230b92ea5e4bdf8bd6658c6292"`)
         await db.query(`ALTER TABLE "position" DROP CONSTRAINT "FK_32d393d9b4c15d1f3253445453e"`)
+        await db.query(`ALTER TABLE "position" DROP CONSTRAINT "FK_3c3dd58c6936a8b6019ccff4947"`)
+        await db.query(`ALTER TABLE "position" DROP CONSTRAINT "FK_c8555d5e1109593ee5ebf6c6995"`)
         await db.query(`ALTER TABLE "position_snapshot" DROP CONSTRAINT "FK_016de40c4f8b13ccf15f9209b7b"`)
         await db.query(`ALTER TABLE "position_snapshot" DROP CONSTRAINT "FK_517394d79735819c6c0912d4840"`)
         await db.query(`ALTER TABLE "position_snapshot" DROP CONSTRAINT "FK_e7b0099f3c24660dd87abef310c"`)
