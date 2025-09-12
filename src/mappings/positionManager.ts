@@ -8,7 +8,7 @@ import {
 } from "../utils/interfaces/interfaces";
 
 import { Multicall } from "../abi/multicall";
-import { Position, PositionSnapshot, Token, Tx } from "../model";
+import { Position, PositionSnapshot, Token, Tx, Tick } from "../model";
 import { BlockMap } from "../utils/blockMap";
 import {
   ADDRESS_ZERO,
@@ -17,8 +17,9 @@ import {
   POSITIONS_ADDRESS,
   MULTICALL_PAGE_SIZE,
 } from "../utils/constants";
+import { createTick } from "../utils/tick";
 import { EntityManager } from "../utils/entityManager";
-import { last, processItem } from "../utils/tools";
+import { last } from "../utils/tools";
 import * as factoryAbi from "./../abi/factory";
 import * as positionsAbi from "./../abi/NonfungiblePositionManager";
 import { BlockData, DataHandlerContext } from "@subsquid/evm-processor";
@@ -83,16 +84,24 @@ async function prefetch(
     if (!ctx.entities.get(Position, id, false)) newPositionIds.push(id);
   }
 
-  const newPositions = await initPositions({ ...ctx, block } as any, newPositionIds);
+  const newPositions = await initPositions({ ...ctx, block, entities: ctx.entities } as any, newPositionIds);
   for (const position of newPositions) {
     ctx.entities.add(position);
   }
 
   for (const position of ctx.entities.values(Position)) {
     ctx.entities.defer(Token, position.token0Id, position.token1Id);
+    // Defer loading tick entities if they exist
+    if (position.tickLower) {
+      ctx.entities.defer(Tick, position.tickLower.id);
+    }
+    if (position.tickUpper) {
+      ctx.entities.defer(Tick, position.tickUpper.id);
+    }
   }
 
   await ctx.entities.load(Token);
+  await ctx.entities.load(Tick);
 }
 
 function processItems(blocks: BlockData[]) {
@@ -335,7 +344,7 @@ function createPosition(positionId: string) {
   return position;
 }
 
-async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
+async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: EntityManager }, ids: string[]) {
   const multicall = new Multicall(ctx, MULTICALL_ADDRESS);
 
   const positionResults = await multicall.tryAggregate(
@@ -352,6 +361,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
     token0Id: string;
     token1Id: string;
     fee: number;
+    tickLower: number;
+    tickUpper: number;
     feeGrowthInside0LastX128: bigint;
     feeGrowthInside1LastX128: bigint;
   }[] = [];
@@ -363,6 +374,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
         token0Id: result.value.token0.toLowerCase(),
         token1Id: result.value.token1.toLowerCase(),
         fee: result.value.fee,
+        tickLower: result.value.tickLower,
+        tickUpper: result.value.tickUpper,
         feeGrowthInside0LastX128: result.value.feeGrowthInside0LastX128,
         feeGrowthInside1LastX128: result.value.feeGrowthInside1LastX128,
       });
@@ -383,6 +396,8 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
   );
 
   const positions: Position[] = [];
+  const ticksToCreate: Tick[] = [];
+  
   for (let i = 0; i < positionsData.length; i++) {
     const position = createPosition(positionsData[i].positionId);
     position.token0Id = positionsData[i].token0Id;
@@ -395,6 +410,51 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
     if (position.poolId === "0x8fe8d9bb8eeba3ed688069c3d6b556c9ca258248")
       continue;
 
+    // Create tick IDs following the pattern from the codebase
+    const tickLowerId = tickId(position.poolId, positionsData[i].tickLower);
+    const tickUpperId = tickId(position.poolId, positionsData[i].tickUpper);
+    
+    // Check if ticks exist in entity manager or create new ones
+    let tickLower: Tick;
+    let tickUpper: Tick;
+    
+    if (ctx.entities) {
+      let existingTickLower = ctx.entities.get(Tick, tickLowerId, false);
+      if (!existingTickLower) {
+        tickLower = createTick(tickLowerId, positionsData[i].tickLower, position.poolId);
+        tickLower.createdAtBlockNumber = ctx.block.height;
+        tickLower.createdAtTimestamp = new Date(ctx.block.timestamp);
+        ctx.entities.add(tickLower);
+      } else {
+        tickLower = existingTickLower;
+      }
+      
+      let existingTickUpper = ctx.entities.get(Tick, tickUpperId, false);
+      if (!existingTickUpper) {
+        tickUpper = createTick(tickUpperId, positionsData[i].tickUpper, position.poolId);
+        tickUpper.createdAtBlockNumber = ctx.block.height;
+        tickUpper.createdAtTimestamp = new Date(ctx.block.timestamp);
+        ctx.entities.add(tickUpper);
+      } else {
+        tickUpper = existingTickUpper;
+      }
+    } else {
+      // If no entity manager, create ticks to be handled later
+      tickLower = createTick(tickLowerId, positionsData[i].tickLower, position.poolId);
+      tickLower.createdAtBlockNumber = ctx.block.height;
+      tickLower.createdAtTimestamp = new Date(ctx.block.timestamp);
+      ticksToCreate.push(tickLower);
+      
+      tickUpper = createTick(tickUpperId, positionsData[i].tickUpper, position.poolId);
+      tickUpper.createdAtBlockNumber = ctx.block.height;
+      tickUpper.createdAtTimestamp = new Date(ctx.block.timestamp);
+      ticksToCreate.push(tickUpper);
+    }
+    
+    // Assign tick references to position
+    position.tickLower = tickLower;
+    position.tickUpper = tickUpper;
+
     positions.push(position);
   }
 
@@ -403,6 +463,10 @@ async function initPositions(ctx: BlockHandlerContext<Store>, ids: string[]) {
 
 function snapshotId(positionId: string, block: number) {
   return `${positionId}#${block}`;
+}
+
+function tickId(poolId: string, tick: number) {
+  return `${poolId}#${tick}`;
 }
 
 interface IncreaseData {
@@ -499,11 +563,3 @@ function processTransafer(log: EvmLog, transaction: any): TransferData {
   };
 }
 
-type Item =
-  | LogItem<{
-      evmLog: {
-        topics: true;
-        data: true;
-      };
-    }>
-  | TransactionItem;

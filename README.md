@@ -17,6 +17,23 @@ Dependencies: Node.js, Docker.
 
 ## Quickstart
 
+### Environment Setup
+
+Before running the squid, you need to set up environment variables:
+
+1. Copy the `.env.example` file to `.env`:
+```bash
+cp .env.example .env
+```
+
+2. Edit the `.env` file and set the required environment variables:
+- `ARCHIVE_GATEWAY_URL`: The archive gateway URL for accessing blockchain data
+- `RPC_ENDPOINT_URL`: The RPC endpoint URL with your API key
+
+**Note:** These environment variables are mandatory. The processor will fail to start if they are not set.
+
+### Running the Squid
+
 ```bash
 # 0. Install @subsquid/cli a.k.a. the sqd command globally
 npm i -g @subsquid/cli
@@ -28,13 +45,17 @@ cd my_squid_name
 # 2. Install dependencies
 npm ci
 
-# 3. Start a Postgres database container and detach
+# 3. Set up environment variables (see Environment Setup above)
+cp .env.example .env
+# Edit .env with your values
+
+# 4. Start a Postgres database container and detach
 sqd up
 
-# 4. Build and start the processor
+# 5. Build and start the processor
 sqd process
 
-# 5. The command above will block the terminal
+# 6. The command above will block the terminal
 #    being busy with fetching the chain data, 
 #    transforming and storing it in the target database.
 #

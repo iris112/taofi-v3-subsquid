@@ -1,6 +1,7 @@
 import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_, ManyToOne as ManyToOne_, Index as Index_, BigIntColumn as BigIntColumn_, FloatColumn as FloatColumn_} from "@subsquid/typeorm-store"
 import {Pool} from "./pool.model"
 import {Token} from "./token.model"
+import {Tick} from "./tick.model"
 
 @Entity_()
 export class Position {
@@ -34,6 +35,14 @@ export class Position {
     @Index_()
     @ManyToOne_(() => Token, {nullable: true})
     token1!: Token
+
+    @Index_()
+    @ManyToOne_(() => Tick, {nullable: true})
+    tickLower!: Tick
+
+    @Index_()
+    @ManyToOne_(() => Tick, {nullable: true})
+    tickUpper!: Tick
 
     @BigIntColumn_({nullable: false})
     liquidity!: bigint
