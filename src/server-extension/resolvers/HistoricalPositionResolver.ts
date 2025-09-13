@@ -173,7 +173,7 @@ export class HistoricalPosition {
 
 @Resolver()
 export class HistoricalPositionResolver {
-  constructor(private tx: () => Promise<EntityManager>) {}
+  constructor(private tx: () => Promise<EntityManager>) { }
 
   @Query(() => [HistoricalPosition])
   async positionsAtBlock(
@@ -227,7 +227,7 @@ export class HistoricalPositionResolver {
     // Transform PositionSnapshot entities to HistoricalPosition
     return snapshots.map(snapshot => new HistoricalPosition({
       id: snapshot.positionId,
-      owner: snapshot.owner,
+      owner: snapshot.position?.owner || snapshot.owner,
       poolId: snapshot.poolId,
       pool: snapshot.pool ? new HistoricalPool({
         id: snapshot.pool.id,
@@ -304,7 +304,8 @@ export class HistoricalPositionResolver {
     const manager = await this.tx()
 
     // Find the latest snapshot for this position at or before the target block
-    const snapshot = await manager.findOne(PositionSnapshot, {
+    // Skip initialization snapshots (owner = 0x0) if there are later ones
+    const snapshots = await manager.find(PositionSnapshot, {
       where: {
         positionId: id,
         blockNumber: LessThanOrEqual(blockNumber)
@@ -312,8 +313,17 @@ export class HistoricalPositionResolver {
       relations: ['pool', 'position', 'position.token0', 'position.token1', 'position.tickLower', 'position.tickUpper'],
       order: {
         blockNumber: 'DESC'
-      }
+      },
+      take: 10  // Get recent snapshots to find the best one
     })
+
+    // Find the first snapshot that's not an initialization snapshot
+    // Initialization snapshots have transactionId ending with '-init'
+    let snapshot = snapshots.find(s => !s.transactionId.endsWith('-init'))
+    if (!snapshot && snapshots.length > 0) {
+      // If all are init snapshots, use the most recent one
+      snapshot = snapshots[0]
+    }
 
     if (!snapshot || !snapshot.position) {
       return null
@@ -321,7 +331,7 @@ export class HistoricalPositionResolver {
 
     return new HistoricalPosition({
       id: snapshot.positionId,
-      owner: snapshot.owner,
+      owner: snapshot.position.owner || snapshot.owner,
       poolId: snapshot.poolId,
       pool: snapshot.pool ? new HistoricalPool({
         id: snapshot.pool.id,
