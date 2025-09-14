@@ -8,6 +8,7 @@ import {
   Bundle,
   Burn,
   Collect,
+  DecreaseLiquidity,
   Factory,
   Mint,
   Pool,
@@ -44,6 +45,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
   await ctx.store.insert(entities.values(Burn));
   await ctx.store.insert(entities.values(Swap));
   await ctx.store.insert(entities.values(Collect));
+  await ctx.store.insert(entities.values(DecreaseLiquidity));
   await ctx.store.save(entities.values(UniswapDayData));
   await ctx.store.save(entities.values(PoolDayData));
   await ctx.store.save(entities.values(PoolHourData)); //

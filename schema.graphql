@@ -286,6 +286,7 @@ type Tx @entity {
   swaps: [Swap]! @derivedFrom(field: "transaction")
   flashed: [Flash]! @derivedFrom(field: "transaction")
   collects: [Collect]! @derivedFrom(field: "transaction")
+  decreaseLiquidities: [DecreaseLiquidity]! @derivedFrom(field: "transaction")
 }
 
 type Mint @entity {
@@ -424,6 +425,31 @@ type Collect @entity {
   tickLower: Int!
   # uppper tick of position
   tickUpper: Int!
+  # index within the txn
+  logIndex: Int
+}
+
+type DecreaseLiquidity @entity {
+  # transaction hash + "#" + index in decreaseLiquidity Transaction array
+  id: ID!
+  # pointer to txn
+  transactionId: ID!
+  transaction: Tx!
+  # timestamp of event
+  timestamp: DateTime!
+  # NFT token ID
+  tokenId: String!
+  # position being modified
+  positionId: ID!
+  position: Position!
+  # amount of liquidity removed
+  liquidity: BigInt!
+  # amount of token0 withdrawn
+  amount0: Float!
+  # amount of token1 withdrawn  
+  amount1: Float!
+  # derived amount based on available prices of tokens
+  amountUSD: Float
   # index within the txn
   logIndex: Int
 }
