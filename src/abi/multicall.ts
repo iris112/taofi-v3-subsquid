@@ -51,9 +51,17 @@ export class Multicall extends ContractBase {
   async aggregate(...args: any[]): Promise<any[]> {
     let [calls, pageSize] = this.makeCalls(args)
     if (calls.length === 0) return []
+    let size = calls.length
+    let results = new Array(size)
+    for (let [from, to] of splitIntoPages(size, pageSize)) {
+      let {returnData} = await this.eth_call(aggregate, {calls: calls.slice(from, to)})
+      for (let i = from; i < to; i++) {
+        let data = returnData[i - from]
+        results[i] = calls[i].func.decodeResult(data)
+      }
+    }
 
-    const {returnData} = await this.eth_call(aggregate, {calls})
-    return returnData.map((data, i) => calls[i].func.decodeResult(data)) 
+    return results
   }
 
   tryAggregate<TF extends AnyFunc>(
@@ -77,25 +85,32 @@ export class Multicall extends ContractBase {
   async tryAggregate(...args: any[]): Promise<any[]> {
     let [calls, pageSize] = this.makeCalls(args)
     if (calls.length === 0) return []
+    let size = calls.length
+    let results = new Array(size)
 
-    const response = await this.eth_call(tryAggregate, {
+    for (let [from, to] of splitIntoPages(size, pageSize)) {
+      let response = await this.eth_call(tryAggregate, {
         requireSuccess: false,
-        calls
-    })
-    return response.map((res, i) => {
-      if (res.success) {
-        try {
-          return {
-            success: true,
-            value: calls[i].func.decodeResult(res.returnData)
+        calls: calls.slice(from, to)
+      })
+      for (let i = from; i < to; i++) {
+        let res = response[i - from]
+        if (res.success) {
+          try {
+            results[i] = {
+              success: true,
+              value: calls[i].func.decodeResult(res.returnData)
+            }
+          } catch (err: any) {
+            results[i] = {success: false, returnData: res.returnData}
           }
-        } catch (err: any) {
-          return {success: false, returnData: res.returnData}
+        } else {
+          results[i] = {success: false}
         }
-      } else {
-        return {success: false}
       }
-    })
+    }
+
+    return results;
   }
 
   private makeCalls(args: any[]): [calls: Call[], page: number] {
@@ -149,12 +164,13 @@ function* splitSlice(maxSize: number, beg: number, end?: number): Iterable<[beg:
   }
 }
 
-function* splitArray<T>(maxSize: number, arr: T[]): Iterable<T[]> {
-  if (arr.length <= maxSize) {
-      yield arr
-  } else {
-      for (let [beg, end] of splitSlice(maxSize, 0, arr.length)) {
-          yield arr.slice(beg, end)
-      }
+function* splitIntoPages(size: number, page: number): Iterable<[from: number, to: number]> {
+  let from = 0
+  while (size) {
+    let step = Math.min(page, size)
+    let to = from + step
+    yield [from, to]
+    size -= step
+    from = to
   }
 }
