@@ -8,7 +8,7 @@ import {
 } from "../utils/interfaces/interfaces";
 
 import { Multicall } from "../abi/multicall";
-import { Position, PositionSnapshot, Token, Tx, Tick } from "../model";
+import { Position, PositionSnapshot, Token, Tx, Tick, DecreaseLiquidity, Bundle } from "../model";
 import { BlockMap } from "../utils/blockMap";
 import {
   ADDRESS_ZERO,
@@ -230,6 +230,30 @@ async function processDecreaseData(
     });
     ctx.entities.add(transaction);
   }
+
+  // Create DecreaseLiquidity entity
+  const decreaseLiquidityId = `${data.transaction.hash}#${data.logIndex || 0}`;
+  const decreaseLiquidity = new DecreaseLiquidity({
+    id: decreaseLiquidityId,
+    transactionId: transaction.id,
+    timestamp: new Date(block.timestamp),
+    tokenId: data.tokenId,
+    positionId: position.id,
+    liquidity: data.liquidity,
+    amount0: amount0,
+    amount1: amount1,
+    logIndex: data.logIndex,
+  });
+
+  // Calculate USD value if possible
+  const bundle = ctx.entities.get(Bundle, "1", false);
+  if (bundle) {
+    const token0USD = token0.derivedETH ? token0.derivedETH * bundle.ethPriceUSD : 0;
+    const token1USD = token1.derivedETH ? token1.derivedETH * bundle.ethPriceUSD : 0;
+    decreaseLiquidity.amountUSD = amount0 * token0USD + amount1 * token1USD;
+  }
+
+  ctx.entities.add(decreaseLiquidity);
 
   updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
@@ -544,6 +568,7 @@ interface DecreaseData {
   amount0: bigint;
   amount1: bigint;
   liquidity: bigint;
+  logIndex?: number;
 }
 
 function processDecreaseLiquidity(log: EvmLog, transaction: any): DecreaseData {
@@ -560,6 +585,7 @@ function processDecreaseLiquidity(log: EvmLog, transaction: any): DecreaseData {
     amount0: event.amount0,
     amount1: event.amount1,
     liquidity: event.liquidity,
+    logIndex: log.logIndex,
   };
 }
 

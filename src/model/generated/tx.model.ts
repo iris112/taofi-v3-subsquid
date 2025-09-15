@@ -4,6 +4,7 @@ import {Burn} from "./burn.model"
 import {Swap} from "./swap.model"
 import {Flash} from "./flash.model"
 import {Collect} from "./collect.model"
+import {DecreaseLiquidity} from "./decreaseLiquidity.model"
 
 @Entity_()
 export class Tx {
@@ -40,4 +41,7 @@ export class Tx {
 
     @OneToMany_(() => Collect, e => e.transaction)
     collects!: Collect[]
+
+    @OneToMany_(() => DecreaseLiquidity, e => e.transaction)
+    decreaseLiquidities!: DecreaseLiquidity[]
 }
