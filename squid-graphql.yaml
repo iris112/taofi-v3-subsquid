@@ -32,10 +32,22 @@ spec:
         - name: DB_NAME
           value: squid
 ---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: squid-graphql-backendconfig
+spec:
+  healthCheck:
+    requestPath: /graphql
+    port: 4350
+    type: HTTP
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: squid-graphql-service
+  annotations:
+    beta.cloud.google.com/backend-config: '{"default": "squid-graphql-backendconfig"}'
 spec:
   selector:
     app: squid-graphql
@@ -43,4 +55,4 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 4350
-  type: LoadBalancer
+  type: NodePort
