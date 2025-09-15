@@ -227,6 +227,10 @@ type Position @entity {
   # vars needed for fee computation
   feeGrowthInside0LastX128: BigInt!
   feeGrowthInside1LastX128: BigInt!
+  # block number when position was last updated
+  lastUpdateBlockNumber: Int!
+  # timestamp when position was last updated
+  lastUpdateTimestamp: DateTime!
 }
 
 type PositionSnapshot @entity {
@@ -241,7 +245,7 @@ type PositionSnapshot @entity {
   positionId: ID!
   position: Position!
   # block in which the snap was created
-  blockNumber: Int!
+  blockNumber: Int! @index
   # timestamp of block in which the snap was created
   timestamp: DateTime!
   # total position liquidity
