@@ -7,6 +7,7 @@ import { processPositions } from "./mappings/positionManager";
 import {
   Bundle,
   Burn,
+  Collect,
   Factory,
   Mint,
   Pool,
@@ -42,6 +43,7 @@ processor.run(new TypeormDatabase(), async (ctx) => {
   await ctx.store.insert(entities.values(Mint));
   await ctx.store.insert(entities.values(Burn));
   await ctx.store.insert(entities.values(Swap));
+  await ctx.store.insert(entities.values(Collect));
   await ctx.store.save(entities.values(UniswapDayData));
   await ctx.store.save(entities.values(PoolDayData));
   await ctx.store.save(entities.values(PoolHourData)); //

@@ -54,6 +54,7 @@ export const processor = new EvmBatchProcessor()
       poolAbi.events.Mint.topic,
       poolAbi.events.Initialize.topic,
       poolAbi.events.Swap.topic,
+      poolAbi.events.Collect.topic,
     ],
     range: {from: FACTORY_DEPLOYED_AT/*poolsMetadata.height+1*/},
     transaction: true,

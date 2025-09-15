@@ -91,17 +91,17 @@ export function getTrackedAmountUSD(
 
   // both are whitelist tokens, return sum of both amounts
   if (whitelist.includes(t0) && whitelist.includes(t1)) {
-    return (amount0USD + amount1USD) / 2;
+    return amount0USD + amount1USD;
   }
 
   // take value of the whitelisted token amount
   if (whitelist.includes(t0) && !whitelist.includes(t1)) {
-    return amount0USD;
+    return amount0USD * 2;
   }
 
   // take value of the whitelisted token amount
   if (!whitelist.includes(t0) && whitelist.includes(t1)) {
-    return amount1USD;
+    return amount1USD * 2;
   }
 
   // neither token is on white list, tracked amount is 0

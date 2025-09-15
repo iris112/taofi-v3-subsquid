@@ -157,6 +157,14 @@ async function prefetch(
           ctx.entities.defer(Tick, tickId(data.poolId, data.tick));
           ctx.entities.defer(Pool, data.poolId);
           break;
+        case "Collect":
+          ctx.entities.defer(Pool, data.poolId);
+          ctx.entities.defer(
+            Tick, 
+            tickId(data.poolId, data.tickLower), 
+            tickId(data.poolId, data.tickUpper)
+          );
+          break;
       }
     }
     dayIds.add(getDayIndex(block.timestamp));
@@ -323,8 +331,9 @@ async function processInitializeData(
   token1.derivedETH = await getEthPerToken(ctx, token1.id);
 
   let usdcPool = await ctx.entities.get(Pool, USDC_WETH_03_POOL);
-  if (usdcPool && usdcPool.token0) {
-    if (usdcPool.token0.id == WETH_ADDRESS) 
+  if (usdcPool) {
+    let usdcPooltoken0 = await ctx.entities.getOrFail(Token, usdcPool.token0Id);
+    if (usdcPooltoken0.id == WETH_ADDRESS) 
       bundle.ethPriceUSD = usdcPool.token1Price
     else 
       bundle.ethPriceUSD = usdcPool.token0Price
@@ -406,12 +415,6 @@ async function processMintData(
   factory.totalValueLockedUSD =
     factory.totalValueLockedETH * bundle.ethPriceUSD;
 
-  token0.totalValueLocked = token0.totalValueLocked + amount0;
-  token0.totalValueLockedUSD = token0.totalValueLocked * token0.derivedETH * bundle.ethPriceUSD;
-
-  token1.totalValueLocked = token1.totalValueLocked + amount1;
-  token1.totalValueLockedUSD = token1.totalValueLocked * token1.derivedETH * bundle.ethPriceUSD;
-
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
   if (!transaction) {
     transaction = createTransaction(block, data.transaction);
@@ -464,36 +467,13 @@ async function processMintData(
   upperTick.liquidityGross += data.amount;
   upperTick.liquidityNet -= data.amount;
 
-  // Update volume metrics
-  let uniswapDayData = await updateUniswapDayData(ctx, block);
-  let poolDayData = await updatePoolDayData(ctx, block, pool.id);
-  let poolHourData = await updatePoolHourData(ctx, block, pool.id);
-  let token0DayData = await updateTokenDayData(ctx, block, token0.id);
-  let token0HourData = await updateTokenHourData(ctx, block, token0.id);
-  let token1DayData = await updateTokenDayData(ctx, block, token1.id);
-  let token1HourData = await updateTokenHourData(ctx, block, token1.id);
-
-  if (poolDayData && poolHourData) {
-    poolDayData.volumeUSD = poolDayData.volumeUSD + amountUSD;
-    poolDayData.volumeToken0 = poolDayData.volumeToken0 + amount0;
-    poolDayData.volumeToken1 = poolDayData.volumeToken1 + amount1;
-
-    poolHourData.volumeUSD = poolHourData.volumeUSD + amountUSD;
-    poolHourData.volumeToken0 = poolHourData.volumeToken0 + amount0;
-    poolHourData.volumeToken1 = poolHourData.volumeToken1 + amount1;
-  }
-
-  token0DayData.volume = token0DayData.volume + amount0;
-  token0DayData.volumeUSD = token0DayData.volumeUSD + amountUSD;
-
-  token0HourData.volume = token0HourData.volume + amount0;
-  token0HourData.volumeUSD = token0HourData.volumeUSD + amountUSD;
-
-  token1DayData.volume = token1DayData.volume + amount1;
-  token1DayData.volumeUSD = token1DayData.volumeUSD + amountUSD;
-
-  token1HourData.volume = token1HourData.volume + amount1;
-  token1HourData.volumeUSD = token1HourData.volumeUSD + amountUSD;
+  await updateUniswapDayData(ctx, block);
+  await updatePoolDayData(ctx, block, pool.id);
+  await updatePoolHourData(ctx, block, pool.id);
+  await updateTokenDayData(ctx, block, token0.id);
+  await updateTokenHourData(ctx, block, token0.id);
+  await updateTokenDayData(ctx, block, token1.id);
+  await updateTokenHourData(ctx, block, token1.id);
 }
 
 async function processBurnData(
@@ -517,24 +497,14 @@ async function processBurnData(
     amount0 * (token0.derivedETH * bundle.ethPriceUSD) +
     amount1 * (token1.derivedETH * bundle.ethPriceUSD);
 
-  // reset tvl aggregates until new amounts calculated
-  factory.totalValueLockedETH =
-    factory.totalValueLockedETH - pool.totalValueLockedETH;
-
   // update globals
   factory.txCount++;
 
   // update token0 data
   token0.txCount++;
-  token0.totalValueLocked = token0.totalValueLocked - amount0;
-  token0.totalValueLockedUSD =
-    token0.totalValueLocked * (token0.derivedETH * bundle.ethPriceUSD);
 
   // update token1 data
   token1.txCount++;
-  token1.totalValueLocked = token1.totalValueLocked - amount1;
-  token1.totalValueLockedUSD =
-    token1.totalValueLocked * (token1.derivedETH * bundle.ethPriceUSD);
 
   // pool data
   pool.txCount++;
@@ -547,28 +517,6 @@ async function processBurnData(
   ) {
     pool.liquidity -= data.amount;
   }
-
-  // pool.totalValueLockedToken0 = pool.totalValueLockedToken0 - amount0;
-  // pool.totalValueLockedToken1 = pool.totalValueLockedToken1 - amount1;
-
-  // // Update TVL in ETH and USD
-  // pool.totalValueLockedETH =
-  //   pool.totalValueLockedToken0 * token0.derivedETH +
-  //   pool.totalValueLockedToken1 * token1.derivedETH;
-  // pool.totalValueLockedUSD = pool.totalValueLockedETH * bundle.ethPriceUSD;
-
-  // // Update factory TVL
-  // factory.totalValueLockedETH =
-  //   factory.totalValueLockedETH + pool.totalValueLockedETH;
-  // factory.totalValueLockedUSD =
-  //   factory.totalValueLockedETH * bundle.ethPriceUSD;
-
-  // // Update token TVL
-  // token0.totalValueLocked = token0.totalValueLocked - amount0;
-  // token0.totalValueLockedUSD = token0.totalValueLocked * token0.derivedETH * bundle.ethPriceUSD;
-
-  // token1.totalValueLocked = token1.totalValueLocked - amount1;
-  // token1.totalValueLockedUSD = token1.totalValueLocked * token1.derivedETH * bundle.ethPriceUSD;
 
   // burn entity
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);
@@ -614,36 +562,13 @@ async function processBurnData(
     upperTick.liquidityNet += data.amount;
   }
 
-  // Update volume metrics
-  let uniswapDayData = await updateUniswapDayData(ctx, block);
-  let poolDayData = await updatePoolDayData(ctx, block, pool.id);
-  let poolHourData = await updatePoolHourData(ctx, block, pool.id);
-  let token0DayData = await updateTokenDayData(ctx, block, token0.id);
-  let token0HourData = await updateTokenHourData(ctx, block, token0.id);
-  let token1DayData = await updateTokenDayData(ctx, block, token1.id);
-  let token1HourData = await updateTokenHourData(ctx, block, token1.id);
-
-  if (poolDayData && poolHourData) {
-    poolDayData.volumeUSD = poolDayData.volumeUSD + amountUSD;
-    poolDayData.volumeToken0 = poolDayData.volumeToken0 + amount0;
-    poolDayData.volumeToken1 = poolDayData.volumeToken1 + amount1;
-
-    poolHourData.volumeUSD = poolHourData.volumeUSD + amountUSD;
-    poolHourData.volumeToken0 = poolHourData.volumeToken0 + amount0;
-    poolHourData.volumeToken1 = poolHourData.volumeToken1 + amount1;
-  }
-
-  token0DayData.volume = token0DayData.volume + amount0;
-  token0DayData.volumeUSD = token0DayData.volumeUSD + amountUSD;
-
-  token0HourData.volume = token0HourData.volume + amount0;
-  token0HourData.volumeUSD = token0HourData.volumeUSD + amountUSD;
-
-  token1DayData.volume = token1DayData.volume + amount1;
-  token1DayData.volumeUSD = token1DayData.volumeUSD + amountUSD;
-
-  token1HourData.volume = token1HourData.volume + amount1;
-  token1HourData.volumeUSD = token1HourData.volumeUSD + amountUSD;
+  await updateUniswapDayData(ctx, block);
+  await updatePoolDayData(ctx, block, pool.id);
+  await updatePoolHourData(ctx, block, pool.id);
+  await updateTokenDayData(ctx, block, token0.id);
+  await updateTokenHourData(ctx, block, token0.id);
+  await updateTokenDayData(ctx, block, token1.id);
+  await updateTokenHourData(ctx, block, token1.id);
 }
 
 async function processSwapData(
@@ -760,8 +685,9 @@ async function processSwapData(
   token1.derivedETH = await getEthPerToken(ctx, token1.id);
 
   let usdcPool = await ctx.entities.get(Pool, USDC_WETH_03_POOL);
-  if (usdcPool && usdcPool.token0) {
-    if (usdcPool.token0.id == WETH_ADDRESS) 
+  if (usdcPool) {
+    let usdcPooltoken0 = await ctx.entities.getOrFail(Token, usdcPool.token0Id);
+    if (usdcPooltoken0.id == WETH_ADDRESS) 
       bundle.ethPriceUSD = usdcPool.token1Price
     else 
       bundle.ethPriceUSD = usdcPool.token0Price
@@ -961,36 +887,13 @@ async function processCollectData(
     })
   );
 
-  // Update volume metrics
-  let uniswapDayData = await updateUniswapDayData(ctx, block);
-  let poolDayData = await updatePoolDayData(ctx, block, pool.id);
-  let poolHourData = await updatePoolHourData(ctx, block, pool.id);
-  let token0DayData = await updateTokenDayData(ctx, block, token0.id);
-  let token0HourData = await updateTokenHourData(ctx, block, token0.id);
-  let token1DayData = await updateTokenDayData(ctx, block, token1.id);
-  let token1HourData = await updateTokenHourData(ctx, block, token1.id);
-
-  if (poolDayData && poolHourData) {
-    poolDayData.volumeUSD = poolDayData.volumeUSD + trackedCollectedAmountUSD;
-    poolDayData.volumeToken0 = poolDayData.volumeToken0 + amount0;
-    poolDayData.volumeToken1 = poolDayData.volumeToken1 + amount1;
-
-    poolHourData.volumeUSD = poolHourData.volumeUSD + trackedCollectedAmountUSD;
-    poolHourData.volumeToken0 = poolHourData.volumeToken0 + amount0;
-    poolHourData.volumeToken1 = poolHourData.volumeToken1 + amount1;
-  }
-
-  token0DayData.volume = token0DayData.volume + amount0;
-  token0DayData.volumeUSD = token0DayData.volumeUSD + trackedCollectedAmountUSD;
-
-  token0HourData.volume = token0HourData.volume + amount0;
-  token0HourData.volumeUSD = token0HourData.volumeUSD + trackedCollectedAmountUSD;
-
-  token1DayData.volume = token1DayData.volume + amount1;
-  token1DayData.volumeUSD = token1DayData.volumeUSD + trackedCollectedAmountUSD;
-
-  token1HourData.volume = token1HourData.volume + amount1;
-  token1HourData.volumeUSD = token1HourData.volumeUSD + trackedCollectedAmountUSD;
+  await updateUniswapDayData(ctx, block);
+  await updatePoolDayData(ctx, block, pool.id);
+  await updatePoolHourData(ctx, block, pool.id);
+  await updateTokenDayData(ctx, block, token0.id);
+  await updateTokenHourData(ctx, block, token0.id);
+  await updateTokenDayData(ctx, block, token1.id);
+  await updateTokenHourData(ctx, block, token1.id);
 }
 
 async function getEthPerToken(
