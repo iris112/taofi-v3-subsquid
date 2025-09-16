@@ -355,7 +355,7 @@ async function updatePositionSnapshot(
   positionSnapshot.collectedFeesToken0 = position.collectedFeesToken0;
   positionSnapshot.collectedFeesToken1 = position.collectedFeesToken1;
   positionSnapshot.feeGrowthInside0LastX128 = position.feeGrowthInside0LastX128;
-  positionSnapshot.feeGrowthInside1LastX128 = position.feeGrowthInside0LastX128;
+  positionSnapshot.feeGrowthInside1LastX128 = position.feeGrowthInside1LastX128;
   return;
 }
 
