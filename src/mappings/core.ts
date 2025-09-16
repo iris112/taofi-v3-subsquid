@@ -39,7 +39,6 @@ import { EntityManager } from "../utils/entityManager";
 import {
   createPoolDayData,
   createPoolHourData,
-  createTickDayData,
   createTokenDayData,
   createTokenHourData,
   createUniswapDayData,
@@ -160,8 +159,8 @@ async function prefetch(
         case "Collect":
           ctx.entities.defer(Pool, data.poolId);
           ctx.entities.defer(
-            Tick, 
-            tickId(data.poolId, data.tickLower), 
+            Tick,
+            tickId(data.poolId, data.tickLower),
             tickId(data.poolId, data.tickUpper)
           );
           break;
@@ -333,9 +332,9 @@ async function processInitializeData(
   let usdcPool = await ctx.entities.get(Pool, USDC_WETH_03_POOL);
   if (usdcPool) {
     let usdcPooltoken0 = await ctx.entities.getOrFail(Token, usdcPool.token0Id);
-    if (usdcPooltoken0.id == WETH_ADDRESS) 
+    if (usdcPooltoken0.id == WETH_ADDRESS)
       bundle.ethPriceUSD = usdcPool.token1Price
-    else 
+    else
       bundle.ethPriceUSD = usdcPool.token0Price
   } else {
     bundle.ethPriceUSD = 0;
@@ -602,14 +601,21 @@ async function processSwapData(
   let amount0USD = amount0ETH * bundle.ethPriceUSD;
   let amount1USD = amount1ETH * bundle.ethPriceUSD;
 
-  // get amount that should be tracked only - div 2 because cant count both input and output as volume
-  let amountTotalUSDTracked = getTrackedAmountUSD(
+  // Get tracked amounts - getTrackedAmountUSD returns:
+  // - If both tokens are whitelisted: sum of both amounts
+  // - If only one is whitelisted: that amount * 2
+  // - If neither is whitelisted: 0
+  // We divide by 2 to get the actual volume (avoiding double counting)
+  let trackedAmountUSD = getTrackedAmountUSD(
     token0.id,
     amount0USD,
     token1.id,
     amount1USD
   );
 
+  // The actual volume is half of the tracked amount (to avoid double counting)
+  // This gives us the correct volume for all cases
+  let amountTotalUSDTracked = trackedAmountUSD / 2;
   let amountTotalETHTracked = safeDiv(
     amountTotalUSDTracked,
     bundle.ethPriceUSD
@@ -687,9 +693,9 @@ async function processSwapData(
   let usdcPool = await ctx.entities.get(Pool, USDC_WETH_03_POOL);
   if (usdcPool) {
     let usdcPooltoken0 = await ctx.entities.getOrFail(Token, usdcPool.token0Id);
-    if (usdcPooltoken0.id == WETH_ADDRESS) 
+    if (usdcPooltoken0.id == WETH_ADDRESS)
       bundle.ethPriceUSD = usdcPool.token1Price
-    else 
+    else
       bundle.ethPriceUSD = usdcPool.token0Price
   } else {
     bundle.ethPriceUSD = 0;
@@ -816,11 +822,15 @@ async function processCollectData(
   if (token1 == null) return;
   let amount1 = BigDecimal(data.amount1, token1.decimals).toNumber();
 
+  // Calculate USD values for the collected amounts
+  const amount0USD = amount0 * token0.derivedETH * bundle.ethPriceUSD;
+  const amount1USD = amount1 * token1.derivedETH * bundle.ethPriceUSD;
+
   const trackedCollectedAmountUSD = getTrackedAmountUSD(
     token0.id,
-    amount0,
+    amount0USD,
     token1.id,
-    amount1
+    amount1USD
   )
 
   // Reset tvl aggregates until new amounts calculated
@@ -854,7 +864,7 @@ async function processCollectData(
   pool.collectedFeesToken0 = pool.collectedFeesToken0 + amount0;
   pool.collectedFeesToken1 = pool.collectedFeesToken1 + amount1;
   pool.collectedFeesUSD = pool.collectedFeesUSD + trackedCollectedAmountUSD;
-  
+
   // reset aggregates with new amounts
   factory.totalValueLockedETH = factory.totalValueLockedETH + pool.totalValueLockedETH;
   factory.totalValueLockedUSD = factory.totalValueLockedETH * bundle.ethPriceUSD;
@@ -926,7 +936,7 @@ async function getEthPerToken(
         let token1 = await ctx.entities.getOrFail(Token, pool.token1Id);
         // Skip if token1's price is not derived yet
         if (token1.derivedETH === 0) continue;
-        
+
         // get the derived ETH in pool
         let ethLocked = pool.totalValueLockedToken1 * token1.derivedETH;
         if (ethLocked > largestLiquidityETH && ethLocked >= MINIMUM_ETH_LOCKED) {
@@ -941,7 +951,7 @@ async function getEthPerToken(
         let token0 = await ctx.entities.getOrFail(Token, pool.token0Id);
         // Skip if token0's price is not derived yet
         if (token0.derivedETH === 0) continue;
-        
+
         // get the derived ETH in pool
         let ethLocked = pool.totalValueLockedToken0 * token0.derivedETH;
         if (ethLocked > largestLiquidityETH && ethLocked >= MINIMUM_ETH_LOCKED) {
@@ -1011,7 +1021,7 @@ async function updatePoolDayData(
 
   let poolDayData = ctx.entities.get(PoolDayData, dayPoolID, false);
   let isNewEntity = !poolDayData;
-  
+
   if (!poolDayData) {
     poolDayData = createPoolDayData(poolId, dayID);
     ctx.entities.add(poolDayData);
@@ -1078,7 +1088,7 @@ async function updatePoolHourData(
 
   let poolHourData = ctx.entities.get(PoolHourData, hourPoolID, false);
   let isNewEntity = !poolHourData;
-  
+
   if (!poolHourData) {
     poolHourData = createPoolHourData(poolId, hourIndex);
     ctx.entities.add(poolHourData);
@@ -1123,7 +1133,7 @@ async function updateTokenDayData(
 
   let tokenDayData = await ctx.entities.get(TokenDayData, tokenDayID, false);
   let isNewEntity = !tokenDayData;
-  
+
   if (tokenDayData == null) {
     tokenDayData = createTokenDayData(tokenId, dayID);
     ctx.entities.add(tokenDayData);
@@ -1166,12 +1176,12 @@ async function updateTokenHourData(
   let bundle = await ctx.entities.getOrFail(Bundle, "1");
   let token = await ctx.entities.getOrFail(Token, tokenId);
 
-  let hourID = getHourIndex(block.timestamp); 
+  let hourID = getHourIndex(block.timestamp);
   let tokenHourID = snapshotId(tokenId, hourID);
 
   let tokenHourData = ctx.entities.get(TokenHourData, tokenHourID, false);
   let isNewEntity = !tokenHourData;
-  
+
   if (tokenHourData == null) {
     tokenHourData = createTokenHourData(tokenId, hourID);
     ctx.entities.add(tokenHourData);
@@ -1206,32 +1216,8 @@ async function updateTokenHourData(
   return tokenHourData;
 }
 
-async function updateTickDayData(
-  ctx: ContextWithEntityManager,
-  block: BlockHeader,
-  tickId: string
-): Promise<TickDayData> {
-  let tick = await ctx.entities.getOrFail(Tick, tickId);
-
-  let dayID = getDayIndex(block.timestamp);
-  let tickDayDataID = snapshotId(tickId, dayID);
-
-  let tickDayData = await ctx.entities.get(TickDayData, tickDayDataID);
-  if (tickDayData == null) {
-    tickDayData = createTickDayData(tickId, dayID);
-    ctx.entities.add(tickDayData);
-  }
-  tickDayData.liquidityGross = tick.liquidityGross;
-  tickDayData.liquidityNet = tick.liquidityNet;
-  tickDayData.volumeToken0 = tick.volumeToken0;
-  tickDayData.volumeToken1 = tick.volumeToken0;
-  tickDayData.volumeUSD = tick.volumeUSD;
-  tickDayData.feesUSD = tick.feesUSD;
-  tickDayData.feeGrowthOutside0X128 = tick.feeGrowthOutside0X128;
-  tickDayData.feeGrowthOutside1X128 = tick.feeGrowthOutside1X128;
-
-  return tickDayData;
-}
+// NOTE: updateTickDayData function removed as it was unused
+// If tick day data updates are needed in the future, this function can be restored
 
 function createTransaction(
   block: { height: number; timestamp: number },
@@ -1439,7 +1425,7 @@ async function updateTickFeeVars(
 
   const tickResult = await multicall.aggregate(
     poolAbi.functions.ticks,
-    ticks.map<[string, {tick: bigint}]>((t) => {
+    ticks.map<[string, { tick: bigint }]>((t) => {
       return [t.poolId, {
         tick: t.tickIdx
       }];
@@ -1459,7 +1445,7 @@ async function updatePoolFeeVars(
 ): Promise<void> {
   let multicall = new Multicall(ctx, MULTICALL_ADDRESS);
 
-  const calls: [string, {}][] = pools.map((p) => {return [p.id, {}];})
+  const calls: [string, {}][] = pools.map((p) => { return [p.id, {}]; })
   let fee0 = await multicall.aggregate(
     poolAbi.functions.feeGrowthGlobal0X128,
     calls,
