@@ -922,7 +922,6 @@ async function getEthPerToken(
   // need to update this to actually detect best rate based on liquidity distribution
   let largestLiquidityETH = MINIMUM_ETH_LOCKED;
   let priceSoFar = 0;
-  let selectedPoolAddress = '';
 
   if (STABLE_COINS.includes(tokenId.toLowerCase())) {
     priceSoFar = safeDiv(1, bundle.ethPriceUSD);
@@ -943,7 +942,6 @@ async function getEthPerToken(
           largestLiquidityETH = ethLocked;
           // token1 per our token * Eth per token1
           priceSoFar = pool.token1Price * token1.derivedETH;
-          selectedPoolAddress = poolAddress;
         }
       }
       if (pool.token1Id.toLowerCase() === tokenId.toLowerCase()) {
@@ -958,7 +956,6 @@ async function getEthPerToken(
           largestLiquidityETH = ethLocked;
           // token0 per our token * ETH per token0
           priceSoFar = pool.token0Price * token0.derivedETH;
-          selectedPoolAddress = poolAddress;
         }
       }
     }
@@ -992,7 +989,6 @@ async function updatePoolDayData(
   poolId: string
 ): Promise<PoolDayData | null> {
   let pool = await ctx.entities.getOrFail(Pool, poolId);
-  let bundle = await ctx.entities.getOrFail(Bundle, "1");
 
   // Skip creating records if there's no valid price data
   if (pool.sqrtPrice === 0n) {
@@ -1019,7 +1015,7 @@ async function updatePoolDayData(
   let dayID = getDayIndex(block.timestamp);
   let dayPoolID = snapshotId(poolId, dayID);
 
-  let poolDayData = ctx.entities.get(PoolDayData, dayPoolID, false);
+  let poolDayData = await ctx.entities.get(PoolDayData, dayPoolID);
   let isNewEntity = !poolDayData;
 
   if (!poolDayData) {
@@ -1059,7 +1055,6 @@ async function updatePoolHourData(
   poolId: string
 ): Promise<PoolHourData | null> {
   let pool = await ctx.entities.getOrFail(Pool, poolId);
-  let bundle = await ctx.entities.getOrFail(Bundle, "1");
 
   // Skip creating records if there's no valid price data
   if (pool.sqrtPrice === 0n) {
@@ -1086,7 +1081,7 @@ async function updatePoolHourData(
   let hourIndex = getHourIndex(block.timestamp);
   let hourPoolID = snapshotId(poolId, hourIndex);
 
-  let poolHourData = ctx.entities.get(PoolHourData, hourPoolID, false);
+  let poolHourData = await ctx.entities.get(PoolHourData, hourPoolID);
   let isNewEntity = !poolHourData;
 
   if (!poolHourData) {
@@ -1131,7 +1126,7 @@ async function updateTokenDayData(
   let dayID = getDayIndex(block.timestamp);
   let tokenDayID = snapshotId(tokenId, dayID);
 
-  let tokenDayData = await ctx.entities.get(TokenDayData, tokenDayID, false);
+  let tokenDayData = ctx.entities.get(TokenDayData, tokenDayID, false);
   let isNewEntity = !tokenDayData;
 
   if (tokenDayData == null) {
@@ -1179,7 +1174,7 @@ async function updateTokenHourData(
   let hourID = getHourIndex(block.timestamp);
   let tokenHourID = snapshotId(tokenId, hourID);
 
-  let tokenHourData = ctx.entities.get(TokenHourData, tokenHourID, false);
+  let tokenHourData = await ctx.entities.get(TokenHourData, tokenHourID);
   let isNewEntity = !tokenHourData;
 
   if (tokenHourData == null) {
