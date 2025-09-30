@@ -24,7 +24,17 @@ import {
   TokenHourData,
   Tx,
   UniswapDayData,
+  BorrowAsset,
+  Collateral,
+  Deposit,
+  Liquidate,
+  RepayAsset,
+  RepayAssetWithCollateral,
+  SturdyPair,
+  User,
+  Withdraw
 } from "./model";
+import { processSturdyPair } from "./mappings/sturdyPair";
 
 processor.run(new TypeormDatabase(), async (ctx) => {
   const entities = new EntityManager(ctx.store);
@@ -32,8 +42,8 @@ processor.run(new TypeormDatabase(), async (ctx) => {
 
   await processFactory(entitiesCtx, ctx.blocks);
   await processPairs(entitiesCtx, ctx.blocks);
-
   await processPositions(entitiesCtx, ctx.blocks);
+  await processSturdyPair(entitiesCtx, ctx.blocks);
 
   await ctx.store.save(entities.values(Bundle));
   await ctx.store.save(entities.values(Factory));
@@ -54,4 +64,13 @@ processor.run(new TypeormDatabase(), async (ctx) => {
   await ctx.store.save(entities.values(TokenHourData));
   await ctx.store.save(entities.values(TickDayData)); //
   await ctx.store.save(entities.values(PositionSnapshot));
+  await ctx.store.save(entities.values(BorrowAsset));
+  await ctx.store.save(entities.values(Collateral));
+  await ctx.store.save(entities.values(Deposit));
+  await ctx.store.save(entities.values(Liquidate));
+  await ctx.store.save(entities.values(RepayAsset));
+  await ctx.store.save(entities.values(RepayAssetWithCollateral));
+  await ctx.store.save(entities.values(SturdyPair));
+  await ctx.store.save(entities.values(User));
+  await ctx.store.save(entities.values(Withdraw));
 });

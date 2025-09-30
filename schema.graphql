@@ -708,3 +708,165 @@ type TokenHourData @entity {
   # close price USD
   close: Float!
 }
+
+# ===============================
+# Main Lending Pool Entity
+# ===============================
+# Tracks cumulative totals of the SturdyPair lending pool.
+# Since we have only one lending pool, there will be only one entity with id = "1".
+type SturdyPair @entity {
+  id: ID! # always "1"
+
+  # =====================
+  # Cumulative totals
+  # =====================
+  totalDeposits: BigInt!       # total amount of assets deposited into the pool
+  totalBorrows: BigInt!        # total amount borrowed by all users
+  totalCollateral: BigInt!     # total collateral deposited by all users
+  totalLiquidations: BigInt!   # total liquidations executed (sum of liquidated assets)
+
+  # =====================
+  # Event counts
+  # =====================
+  depositCount: BigInt!        # number of deposit events processed
+  withdrawCount: BigInt!       # number of withdraw events processed
+  borrowCount: BigInt!         # number of borrow events processed
+  repayCount: BigInt!           # number of repay events processed
+  collateralCount: BigInt!     # number of collateral add/remove events processed
+  liquidationCount: BigInt!    # number of liquidation events processed
+
+  # =====================
+  # Last updated
+  # =====================
+  lastUpdateBlockNumber: BigInt! # block number of last update
+  lastUpdateTimestamp: DateTime!   # timestamp of last update
+}
+
+# ===============================
+# User Entity
+# ===============================
+# Tracks per-user cumulative stats.
+type User @entity {
+  id: ID! # user address
+
+  # Cumulative totals per user
+  totalDeposits: BigInt!
+  totalBorrows: BigInt!
+  totalCollateral: BigInt!
+
+  # Count of events per user
+  depositCount: BigInt!
+  withdrawCount: BigInt!
+  borrowCount: BigInt!
+  repayCount: BigInt!
+  collateralCount: BigInt!
+
+  # Last updated block and timestamp
+  lastUpdateBlockNumber: BigInt!
+  lastUpdateTimestamp: DateTime!
+}
+
+# ===============================
+# Deposit Event
+# ===============================
+# Tracks deposits into the lending pool
+type Deposit @entity {
+  id: ID! # can be `${blockNumber}-${logIndex}`
+
+  caller: String!   # transaction sender
+  owner: String!    # owner of shares
+  assets: BigInt!   # amount deposited
+  shares: BigInt!   # shares credited to receiver
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# ===============================
+# Withdraw Event
+# ===============================
+# Tracks withdrawals from the lending pool
+type Withdraw @entity {
+  id: ID!
+
+  caller: String!
+  owner: String!
+  receiver: String!
+  assets: BigInt!
+  shares: BigInt!
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# ===============================
+# Borrow Asset Event
+# ===============================
+type BorrowAsset @entity {
+  id: ID!
+
+  borrower: String!   # account opening debt
+  receiver: String!   # account receiving asset
+  borrowAmount: BigInt!
+  sharesAdded: BigInt!  # borrow shares assigned
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# ===============================
+# Repay Asset Event
+# ===============================
+type RepayAsset @entity {
+  id: ID!
+
+  payer: String!     # account paying
+  borrower: String!  # account whose debt decreases
+  amountToRepay: BigInt!
+  shares: BigInt!     # borrow shares debited
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# Repay using collateral via leverage
+type RepayAssetWithCollateral @entity {
+  id: ID!
+
+  borrower: String!          # account repaying
+  swapperAddress: String!    # swapper contract converting collateral to asset
+  collateralToSwap: BigInt!  # collateral amount used
+  amountAssetOut: BigInt!    # asset received and repaid
+  sharesRepaid: BigInt!      # borrow shares repaid
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# ===============================
+# Collateral Event
+# ===============================
+# Tracks collateral added or removed
+type Collateral @entity {
+  id: ID!
+
+  sender: String!    # account providing collateral
+  borrower: String!  # account whose collateral changes
+  amount: BigInt!    # collateral amount
+  action: String!    # "ADD" or "REMOVE"
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}
+
+# ===============================
+# Liquidation Event
+# ===============================
+# Tracks liquidations of insolvent borrowers
+type Liquidate @entity {
+  id: ID!
+
+  borrower: String!                  # account being liquidated
+  collateralForLiquidator: BigInt!  # collateral sent to liquidator
+  sharesToLiquidate: BigInt!        # borrow shares liquidator repaid
+  amountLiquidatorToRepay: BigInt!  # asset repaid by liquidator
+  feesAmount: BigInt!                # protocol fee from liquidation
+  sharesToAdjust: BigInt!            # borrow shares adjusted/write-off
+  amountToAdjust: BigInt!            # asset amount adjusted/write-off
+  timestamp: DateTime!
+  blockNumber: BigInt!
+}

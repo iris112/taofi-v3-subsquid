@@ -1,7 +1,9 @@
 import {
   FACTORY_ADDRESS,
   FACTORY_DEPLOYED_AT,
-  POSITIONS_ADDRESS
+  POSITIONS_ADDRESS,
+  STURDY_PAIR_ADDRESS,
+  STURDY_PAIR_DEPLOYED_AT
 } from "./utils/constants";
 
 import {
@@ -16,6 +18,7 @@ import {
 import * as factoryAbi from "./abi/factory";
 import * as poolAbi from "./abi/pool";
 import * as positionsAbi from "./abi/NonfungiblePositionManager";
+import * as sturdypairAbi from "./abi/SturdyPair";
 
 // Load environment variables (required)
 if (!process.env.ARCHIVE_GATEWAY_URL) {
@@ -67,6 +70,21 @@ export const processor = new EvmBatchProcessor()
       positionsAbi.events.Collect.topic,
       positionsAbi.events.Transfer.topic,
     ],
+    transaction: true,
+  })
+  .addLog({
+    address: [STURDY_PAIR_ADDRESS],
+    topic0: [
+      sturdypairAbi.events.Deposit.topic,
+      sturdypairAbi.events.Withdraw.topic,
+      sturdypairAbi.events.BorrowAsset.topic,
+      sturdypairAbi.events.RepayAsset.topic,
+      sturdypairAbi.events.RepayAssetWithCollateral.topic,
+      sturdypairAbi.events.AddCollateral.topic,
+      sturdypairAbi.events.RemoveCollateral.topic,
+      sturdypairAbi.events.Liquidate.topic,
+    ],
+    range: {from: STURDY_PAIR_DEPLOYED_AT},
     transaction: true,
   })
   .setFields({
