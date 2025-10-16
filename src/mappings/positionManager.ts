@@ -70,23 +70,36 @@ async function prefetch(
   block: BlockHeader
 ) {
   const positionIds = new Set<string>();
-  for (const [, blockEventsData] of eventsData) {
+  const firstBlockByPosition = new Map<string, BlockHeader>();
+
+  for (const [blockHeader, blockEventsData] of eventsData) {
     for (const data of blockEventsData) {
       ctx.entities.defer(Position, data.tokenId);
       positionIds.add(data.tokenId);
+      if (!firstBlockByPosition.has(data.tokenId)) {
+        firstBlockByPosition.set(data.tokenId, blockHeader);
+      }
     }
   }
 
   await ctx.entities.load(Position);
 
-  const newPositionIds: string[] = [];
+  const newPositionsInput: { id: string; block: BlockHeader }[] = [];
   for (const id of positionIds) {
-    if (!ctx.entities.get(Position, id, false)) newPositionIds.push(id);
+    if (!ctx.entities.get(Position, id, false)) {
+      const blockForPosition = firstBlockByPosition.get(id) ?? block;
+      newPositionsInput.push({ id, block: blockForPosition });
+    }
   }
 
-  const newPositions = await initPositions({ ...ctx, block, entities: ctx.entities } as any, newPositionIds);
-  for (const position of newPositions) {
-    ctx.entities.add(position);
+  if (newPositionsInput.length > 0) {
+    const newPositions = await initPositions(
+      { ...ctx, block, entities: ctx.entities } as any,
+      newPositionsInput
+    );
+    for (const position of newPositions) {
+      ctx.entities.add(position);
+    }
   }
 
   for (const position of ctx.entities.values(Position)) {
@@ -318,7 +331,7 @@ async function processTransferData(
     });
     ctx.entities.add(transaction);
   }
-  
+
   updatePositionSnapshot(ctx, block, position.id, data.transaction);
 }
 
@@ -378,8 +391,19 @@ function createPosition(positionId: string) {
   return position;
 }
 
-async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: EntityManager }, ids: string[]) {
+async function initPositions(
+  ctx: BlockHandlerContext<Store> & { entities?: EntityManager },
+  newPositions: { id: string; block: BlockHeader }[]
+) {
+  if (newPositions.length === 0) return [];
+
   const multicall = new Multicall(ctx, MULTICALL_ADDRESS);
+
+  const ids = newPositions.map((item) => item.id);
+  const positionBlockMap = new Map<string, BlockHeader>();
+  for (const { id, block } of newPositions) {
+    positionBlockMap.set(id.toLowerCase(), block);
+  }
 
   const positionResults = await multicall.tryAggregate(
     positionsAbi.functions.positions,
@@ -431,7 +455,7 @@ async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: Enti
 
   const positions: Position[] = [];
   const ticksToCreate: Tick[] = [];
-  
+
   for (let i = 0; i < positionsData.length; i++) {
     const position = createPosition(positionsData[i].positionId);
     position.token0Id = positionsData[i].token0Id;
@@ -444,30 +468,36 @@ async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: Enti
     if (position.poolId === "0x8fe8d9bb8eeba3ed688069c3d6b556c9ca258248")
       continue;
 
+    const positionBlock =
+      positionBlockMap.get(position.id) ?? ctx.block;
+    const blockNumber = positionBlock.height;
+    const blockTimestamp = positionBlock.timestamp;
+    const blockDate = new Date(blockTimestamp);
+
     // Create tick IDs following the pattern from the codebase
     const tickLowerId = tickId(position.poolId, positionsData[i].tickLower);
     const tickUpperId = tickId(position.poolId, positionsData[i].tickUpper);
-    
+
     // Check if ticks exist in entity manager or create new ones
     let tickLower: Tick;
     let tickUpper: Tick;
-    
+
     if (ctx.entities) {
       let existingTickLower = ctx.entities.get(Tick, tickLowerId, false);
       if (!existingTickLower) {
         tickLower = createTick(tickLowerId, positionsData[i].tickLower, position.poolId);
-        tickLower.createdAtBlockNumber = ctx.block.height;
-        tickLower.createdAtTimestamp = new Date(ctx.block.timestamp);
+        tickLower.createdAtBlockNumber = blockNumber;
+        tickLower.createdAtTimestamp = blockDate;
         ctx.entities.add(tickLower);
       } else {
         tickLower = existingTickLower;
       }
-      
+
       let existingTickUpper = ctx.entities.get(Tick, tickUpperId, false);
       if (!existingTickUpper) {
         tickUpper = createTick(tickUpperId, positionsData[i].tickUpper, position.poolId);
-        tickUpper.createdAtBlockNumber = ctx.block.height;
-        tickUpper.createdAtTimestamp = new Date(ctx.block.timestamp);
+        tickUpper.createdAtBlockNumber = blockNumber;
+        tickUpper.createdAtTimestamp = blockDate;
         ctx.entities.add(tickUpper);
       } else {
         tickUpper = existingTickUpper;
@@ -475,29 +505,29 @@ async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: Enti
     } else {
       // If no entity manager, create ticks to be handled later
       tickLower = createTick(tickLowerId, positionsData[i].tickLower, position.poolId);
-      tickLower.createdAtBlockNumber = ctx.block.height;
-      tickLower.createdAtTimestamp = new Date(ctx.block.timestamp);
+      tickLower.createdAtBlockNumber = blockNumber;
+      tickLower.createdAtTimestamp = blockDate;
       ticksToCreate.push(tickLower);
-      
+
       tickUpper = createTick(tickUpperId, positionsData[i].tickUpper, position.poolId);
-      tickUpper.createdAtBlockNumber = ctx.block.height;
-      tickUpper.createdAtTimestamp = new Date(ctx.block.timestamp);
+      tickUpper.createdAtBlockNumber = blockNumber;
+      tickUpper.createdAtTimestamp = blockDate;
       ticksToCreate.push(tickUpper);
     }
-    
+
     // Assign tick references to position
     position.tickLower = tickLower;
     position.tickUpper = tickUpper;
 
     // Create an initial snapshot for the new position
-    const initialSnapshot = new PositionSnapshot({ 
-      id: `${position.id}#${ctx.block.height}` 
+    const initialSnapshot = new PositionSnapshot({
+      id: `${position.id}#${blockNumber}`
     });
     initialSnapshot.owner = position.owner;
     initialSnapshot.poolId = position.poolId;
     initialSnapshot.positionId = position.id;
-    initialSnapshot.blockNumber = ctx.block.height;
-    initialSnapshot.timestamp = new Date(ctx.block.timestamp);
+    initialSnapshot.blockNumber = blockNumber;
+    initialSnapshot.timestamp = blockDate;
     initialSnapshot.liquidity = position.liquidity;
     initialSnapshot.depositedToken0 = position.depositedToken0;
     initialSnapshot.depositedToken1 = position.depositedToken1;
@@ -507,21 +537,22 @@ async function initPositions(ctx: BlockHandlerContext<Store> & { entities?: Enti
     initialSnapshot.collectedFeesToken1 = position.collectedFeesToken1;
     initialSnapshot.feeGrowthInside0LastX128 = position.feeGrowthInside0LastX128;
     initialSnapshot.feeGrowthInside1LastX128 = position.feeGrowthInside1LastX128;
-    
+
     // Create a placeholder transaction for the initial snapshot
     const placeholderTx = new Tx({
-      id: `${ctx.block.height}-${position.id}-init`,
-      blockNumber: ctx.block.height,
-      timestamp: new Date(ctx.block.timestamp),
+      id: `${blockNumber}-${position.id}-init`,
+      blockNumber,
+      timestamp: blockDate,
       gasUsed: 0n,
       gasPrice: 0n,
     });
-    
+
+    initialSnapshot.transactionId = placeholderTx.id;
+
     if (ctx.entities) {
       ctx.entities.add(placeholderTx);
       ctx.entities.add(initialSnapshot);
     }
-    initialSnapshot.transactionId = placeholderTx.id;
 
     positions.push(position);
   }
@@ -632,4 +663,3 @@ function processTransafer(log: EvmLog, transaction: any): TransferData {
     to: event.to.toLowerCase(),
   };
 }
-
