@@ -1,0 +1,46 @@
+# =======================
+# Processor (your squid lib/main.js)
+# =======================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squid-processor1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squid-processor1
+  template:
+    metadata:
+      labels:
+        app: squid-processor1
+    spec:
+      initContainers:
+      - name: run-migrations
+        image: us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest
+        command: ["npx", "squid-typeorm-migration", "apply"]
+        env:
+        - name: DB_HOST
+          value: squid-postgres1
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASS
+          value: postgres
+        - name: DB_NAME
+          value: squid
+      containers:
+      - name: processor
+        image: us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest
+        env:
+        - name: DB_HOST
+          value: squid-postgres1
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          value: postgres
+        - name: DB_PASS
+          value: postgres
+        - name: DB_NAME
+          value: squid
