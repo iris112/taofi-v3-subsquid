@@ -769,16 +769,16 @@ async function processSwapData(
     token1HourData.untrackedVolumeUSD + amountTotalUSDUntracked;
   token1HourData.feesUSD = token1HourData.feesUSD + feesUSD;
 
-  // Update inner vars of current or crossed ticks
-  let newTick = pool.tick;
-  let tickSpacing = feeTierToTickSpacing(pool.feeTier);
-  let modulo = Math.floor(Number(newTick) / Number(tickSpacing));
-  if (modulo == 0) {
-    let tick = createTick(tickId(pool.id, newTick), newTick, pool.id);
-    tick.createdAtBlockNumber = block.height;
-    tick.createdAtTimestamp = new Date(block.timestamp);
-    ctx.entities.add(tick);
-  }
+  // // Update inner vars of current or crossed ticks
+  // let newTick = pool.tick;
+  // let tickSpacing = feeTierToTickSpacing(pool.feeTier);
+  // let modulo = Math.floor(Number(newTick) / Number(tickSpacing));
+  // if (modulo == 0) {
+  //   let tick = createTick(tickId(pool.id, newTick), newTick, pool.id);
+  //   tick.createdAtBlockNumber = block.height;
+  //   tick.createdAtTimestamp = new Date(block.timestamp);
+  //   ctx.entities.add(tick);
+  // }
 
   // create Swap event
   let transaction = ctx.entities.get(Tx, data.transaction.hash, false);

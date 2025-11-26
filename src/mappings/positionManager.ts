@@ -2,8 +2,6 @@ import { BigDecimal } from "@subsquid/big-decimal";
 
 import {
   BlockHandlerContext,
-  LogItem,
-  TransactionItem,
   BlockHeader,
 } from "../utils/interfaces/interfaces";
 
@@ -387,6 +385,8 @@ function createPosition(positionId: string) {
   position.feeGrowthInside1LastX128 = 0n;
   position.lastUpdateBlockNumber = 0;
   position.lastUpdateTimestamp = new Date(0);
+  position.createdAtBlockNumber = 0;
+  position.createdAtTimestamp = new Date(0);
 
   return position;
 }
@@ -517,7 +517,12 @@ async function initPositions(
 
     // Assign tick references to position
     position.tickLower = tickLower;
+    position.tickIdxLower = tickLower.tickIdx;
     position.tickUpper = tickUpper;
+    position.tickIdxUpper = tickUpper.tickIdx;
+
+    position.createdAtBlockNumber = blockNumber;
+    position.createdAtTimestamp = blockDate;
 
     // Create an initial snapshot for the new position
     const initialSnapshot = new PositionSnapshot({

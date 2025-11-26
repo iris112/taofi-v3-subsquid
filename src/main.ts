@@ -4,6 +4,7 @@ import { EntityManager } from "./utils/entityManager";
 import { processFactory } from "./mappings/factory";
 import { processPairs } from "./mappings/core";
 import { processPositions } from "./mappings/positionManager";
+import { processFeeSnapshots } from "./mappings/positionFeeSnapshot";
 import {
   Bundle,
   Burn,
@@ -15,6 +16,7 @@ import {
   PoolDayData,
   PoolHourData,
   Position,
+  PositionFeeSnapshot,
   PositionSnapshot,
   Swap,
   Tick,
@@ -54,4 +56,9 @@ processor.run(new TypeormDatabase(), async (ctx) => {
   await ctx.store.save(entities.values(TokenHourData));
   await ctx.store.save(entities.values(TickDayData)); //
   await ctx.store.save(entities.values(PositionSnapshot));
+
+  await processFeeSnapshots(entitiesCtx, ctx.blocks);
+
+  await ctx.store.save(entities.values(Position));
+  await ctx.store.save(entities.values(PositionFeeSnapshot));
 });

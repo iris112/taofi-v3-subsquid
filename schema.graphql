@@ -208,8 +208,12 @@ type Position @entity {
   token1: Token!
   # lower tick of the position
   tickLower: Tick!
+  # lower tick index
+  tickIdxLower: BigInt!
   # upper tick of the position
   tickUpper: Tick!
+  # upper tick index
+  tickIdxUpper: BigInt!
   # total position liquidity
   liquidity: BigInt!
   # amount of token 0 ever deposited to position
@@ -231,6 +235,10 @@ type Position @entity {
   lastUpdateBlockNumber: Int!
   # timestamp when position was last updated
   lastUpdateTimestamp: DateTime!
+  # created time
+  createdAtTimestamp: DateTime!
+  # created block
+  createdAtBlockNumber: Int!
 }
 
 type PositionSnapshot @entity {
@@ -707,4 +715,25 @@ type TokenHourData @entity {
   low: Float!
   # close price USD
   close: Float!
+}
+
+type PositionFeeSnapshot @entity {
+  # <NFT token id>#<block number>
+  id: ID!
+  # owner of the NFT
+  owner: String!
+  # pool the position is within
+  poolId: ID!
+  pool: Pool!
+  # position of which the snap was taken of
+  positionId: ID!
+  position: Position!
+  # block in which the snap was created
+  blockNumber: Int! @index
+  # timestamp of block in which the snap was created
+  timestamp: DateTime!
+  # fee token0
+  totalFeeToken0: Float!
+  # fee token1
+  totalFeeToken1: Float!
 }

@@ -40,9 +40,15 @@ export class Position {
     @ManyToOne_(() => Tick, {nullable: true})
     tickLower!: Tick
 
+    @BigIntColumn_({nullable: false})
+    tickIdxLower!: bigint
+
     @Index_()
     @ManyToOne_(() => Tick, {nullable: true})
     tickUpper!: Tick
+
+    @BigIntColumn_({nullable: false})
+    tickIdxUpper!: bigint
 
     @BigIntColumn_({nullable: false})
     liquidity!: bigint
@@ -76,4 +82,10 @@ export class Position {
 
     @DateTimeColumn_({nullable: false})
     lastUpdateTimestamp!: Date
+
+    @DateTimeColumn_({nullable: false})
+    createdAtTimestamp!: Date
+
+    @IntColumn_({nullable: false})
+    createdAtBlockNumber!: number
 }
