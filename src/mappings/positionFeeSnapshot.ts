@@ -3,10 +3,8 @@ import {
 } from "../utils/interfaces/interfaces";
 
 import { Multicall } from "../abi/multicall";
-import { Position, Tick, Pool, PositionFeeSnapshot } from "../model";
+import { Position, Tick, Pool, Token, PositionFeeSnapshot } from "../model";
 import {
-  ADDRESS_ZERO,
-
   MULTICALL_ADDRESS,
   POSITIONS_ADDRESS,
   MULTICALL_PAGE_SIZE,
@@ -17,6 +15,7 @@ import * as positionsAbi from "../abi/NonfungiblePositionManager";
 import { BlockData, DataHandlerContext } from "@subsquid/evm-processor";
 import { Store } from "@subsquid/typeorm-store";
 import { FindOperator } from "typeorm";
+import { BigDecimal } from "@subsquid/big-decimal";
 
 type ContextWithEntityManager = DataHandlerContext<Store> & {
   entities: EntityManager;
@@ -37,7 +36,14 @@ export async function processFeeSnapshots(
     })
     if (positions.length == 0) continue;
 
-    const poolTick = poolTicks.filter((pt) => pt.blockNumber <= block.header.height).slice(-1)[0]?.tick || 0;
+    const token0 = ctx.entities.get(Token, positions[0].token0Id, false);
+    const token1 = ctx.entities.get(Token, positions[0].token1Id, false);
+    if (!token0 || !token1) continue;
+
+    const pool = ctx.entities.get(Pool, positions[0].poolId, false);
+    if (!pool) continue;
+
+    const poolTick = poolTicks.filter((pt) => pt.blockNumber <= block.header.height).slice(-1)[0]?.tick || pool.tick || 0;
 
     const positionCalls = positions.map((position) => { return { tokenId: BigInt(position.id) }; });
     const poolCalls:[string, {}][] = positions.map((position) => { return [position.poolId, {}]; });
@@ -85,6 +91,10 @@ export async function processFeeSnapshots(
       const id = positions.indexOf(position);
       position.feeGrowthInside0LastX128 = positionResults[id].feeGrowthInside0LastX128;
       position.feeGrowthInside1LastX128 = positionResults[id].feeGrowthInside1LastX128;
+      if (positionResults[id].feeGrowthInside0LastX128 > poolFee0Results[id] ||
+        positionResults[id].feeGrowthInside1LastX128 > poolFee1Results[id]) {
+        continue;
+      }
 
       const feeGrowthInside0 = getFeeGrowthInside(
         poolTick,
@@ -114,8 +124,8 @@ export async function processFeeSnapshots(
 
       const feeSnapshotId = snapshotId(position.id, block.header.height);
       const positionFeeSnapshot = createPositionFeeSnapshot(feeSnapshotId, position, block.header);
-      positionFeeSnapshot.totalFeeToken0 = Number(token0Fee) + position.collectedFeesToken0;
-      positionFeeSnapshot.totalFeeToken1 = Number(token1Fee) + position.collectedFeesToken1;
+      positionFeeSnapshot.totalFeeToken0 = BigDecimal(token0Fee, token0.decimals).toNumber() + position.collectedFeesToken0;
+      positionFeeSnapshot.totalFeeToken1 = BigDecimal(token1Fee, token1.decimals).toNumber() + position.collectedFeesToken1;
       ctx.entities.add(positionFeeSnapshot);
     }
   }
@@ -196,21 +206,34 @@ function getFeeGrowthInside(
   tickLower: number,
   tickUpper: number,
   feeGrowthGlobalX128: bigint,
-  feeGrowthOutsideLowerX128: bigint,
-  feeGrowthOutsideUpperX128: bigint
+  lowerFeeGrowthOutsideX128: bigint,
+  upperFeeGrowthOutsideX128: bigint
 ): bigint {
-  let feeGrowthInside: bigint;
 
-  if (tickCurrent < tickLower) {
-    // current tick below range
-    feeGrowthInside = feeGrowthOutsideLowerX128 - feeGrowthOutsideUpperX128;
-  } else if (tickCurrent >= tickUpper) {
-    // current tick above range
-    feeGrowthInside = feeGrowthOutsideUpperX128 - feeGrowthOutsideLowerX128;
+  let feeGrowthBelow: bigint;
+  let feeGrowthAbove: bigint;
+
+  // ----- FEE GROWTH BELOW -----
+  if (tickCurrent >= tickLower) {
+    // price is above tickLower → outside is BELOW
+    feeGrowthBelow = lowerFeeGrowthOutsideX128;
   } else {
-    // current tick inside range
-    feeGrowthInside = feeGrowthGlobalX128 - feeGrowthOutsideLowerX128 - feeGrowthOutsideUpperX128;
+    // price is below tickLower → subtract below from global
+    feeGrowthBelow = feeGrowthGlobalX128 - lowerFeeGrowthOutsideX128;
   }
+
+  // ----- FEE GROWTH ABOVE -----
+  if (tickCurrent < tickUpper) {
+    // price is below tickUpper → outside is ABOVE
+    feeGrowthAbove = upperFeeGrowthOutsideX128;
+  } else {
+    // price is above tickUpper → subtract above from global
+    feeGrowthAbove = feeGrowthGlobalX128 - upperFeeGrowthOutsideX128;
+  }
+
+  // ----- FEE GROWTH INSIDE -----
+  const feeGrowthInside =
+    feeGrowthGlobalX128 - feeGrowthBelow - feeGrowthAbove;
 
   return feeGrowthInside;
 }
