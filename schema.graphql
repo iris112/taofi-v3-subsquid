@@ -239,6 +239,9 @@ type Position @entity {
   createdAtTimestamp: DateTime!
   # created block
   createdAtBlockNumber: Int!
+  # last idx of the positionFeeSnapshot
+  lastPositionFeeSnapshotId: ID
+  lastPositionFeeSnapshot: PositionFeeSnapshot
 }
 
 type PositionSnapshot @entity {

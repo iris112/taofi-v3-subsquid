@@ -122,11 +122,22 @@ export async function processFeeSnapshots(
       const token0Fee = position.liquidity * feeDelta0 / divisor;
       const token1Fee = position.liquidity * feeDelta1 / divisor;
 
+      const totalFeeToken0 = BigDecimal(token0Fee, token0.decimals).toNumber() + position.collectedFeesToken0;
+      const totalFeeToken1 = BigDecimal(token1Fee, token1.decimals).toNumber() + position.collectedFeesToken1;
+
       const feeSnapshotId = snapshotId(position.id, block.header.height);
+      if (position.lastPositionFeeSnapshotId) {
+        const lastPositionFeeSnapshot = ctx.entities.get(PositionFeeSnapshot, position.lastPositionFeeSnapshotId, false);
+        if (lastPositionFeeSnapshot && lastPositionFeeSnapshot.totalFeeToken0 == totalFeeToken0 && lastPositionFeeSnapshot.totalFeeToken1 == totalFeeToken1) {
+          continue;
+        }
+      }
       const positionFeeSnapshot = createPositionFeeSnapshot(feeSnapshotId, position, block.header);
       positionFeeSnapshot.totalFeeToken0 = BigDecimal(token0Fee, token0.decimals).toNumber() + position.collectedFeesToken0;
       positionFeeSnapshot.totalFeeToken1 = BigDecimal(token1Fee, token1.decimals).toNumber() + position.collectedFeesToken1;
       ctx.entities.add(positionFeeSnapshot);
+
+      position.lastPositionFeeSnapshotId = positionFeeSnapshot.id;
     }
   }
 }
@@ -148,11 +159,13 @@ async function prefetch(
       ctx.entities.defer(Tick, position.tickIdxLower);
       ctx.entities.defer(Tick, position.tickIdxUpper);
       ctx.entities.defer(Pool, position.poolId);
+      if (position.lastPositionFeeSnapshotId) ctx.entities.defer(PositionFeeSnapshot, position.lastPositionFeeSnapshotId);
     }
 
     
     await ctx.entities.load(Tick);
     await ctx.entities.load(Pool);
+    await ctx.entities.load(PositionFeeSnapshot);
   }
 
   return positionIds;

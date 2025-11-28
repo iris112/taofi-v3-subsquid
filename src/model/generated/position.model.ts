@@ -2,6 +2,7 @@ import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, S
 import {Pool} from "./pool.model"
 import {Token} from "./token.model"
 import {Tick} from "./tick.model"
+import {PositionFeeSnapshot} from "./positionFeeSnapshot.model"
 
 @Entity_()
 export class Position {
@@ -88,4 +89,11 @@ export class Position {
 
     @IntColumn_({nullable: false})
     createdAtBlockNumber!: number
+
+    @StringColumn_({nullable: true})
+    lastPositionFeeSnapshotId!: string | undefined | null
+
+    @Index_()
+    @ManyToOne_(() => PositionFeeSnapshot, {nullable: true})
+    lastPositionFeeSnapshot!: PositionFeeSnapshot | undefined | null
 }
