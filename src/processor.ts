@@ -56,7 +56,18 @@ export const processor = new EvmBatchProcessor()
       poolAbi.events.Swap.topic,
       poolAbi.events.Collect.topic,
     ],
-    range: {from: FACTORY_DEPLOYED_AT/*poolsMetadata.height+1*/},
+    range: {from: FACTORY_DEPLOYED_AT, to: 5618530},
+    transaction: true,
+  })
+  .addLog({
+    topic0: [
+      poolAbi.events.Burn.topic,
+      poolAbi.events.Mint.topic,
+      poolAbi.events.Initialize.topic,
+      poolAbi.events.Swap.topic,
+      poolAbi.events.Collect.topic,
+    ],
+    range: {from: 7300000},
     transaction: true,
   })
   .addLog({
@@ -67,6 +78,7 @@ export const processor = new EvmBatchProcessor()
       positionsAbi.events.Collect.topic,
       positionsAbi.events.Transfer.topic,
     ],
+    range: {from: 7300000},
     transaction: true,
   })
   .setFields({

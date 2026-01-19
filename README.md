@@ -1,20 +1,3 @@
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/subsquid/squid-evm-template)
-
-# Minimal EVM squid
-
-This is a starter template of a squid indexer for EVM networks (Ethereum, Polygon, BSC, etc.). See [Squid SDK docs](https://docs.subsquid.io/) for a complete reference.
-
-To extract EVM logs and transactions by a topic or a contract address, use `EvmBatchProcessor.addLog()` and `EvmBatchProcessor.addTransaction()` methods of the `EvmBatchProcessor` instance defined in `src/processor.ts`. 
-
-The requested data is transformed in batches by a single handler provided to the `processor.run()` method. 
-
-For a full list of supported networks and config options,
-check the [`EvmBatchProcessor` overview](https://docs.subsquid.io/develop-a-squid/evm-processor/) and the [configuration page](https://docs.subsquid.io/develop-a-squid/evm-processor/configuration/).
-
-For a step-by-step migration guide from TheGraph, see [the dedicated docs page](https://docs.subsquid.io/migrate/migrate-subgraph/).
-
-Dependencies: Node.js, Docker.
-
 ## Quickstart
 
 ### Environment Setup
@@ -104,6 +87,34 @@ sqd typegen
 ```
 
 See more details on the [`squid-evm-typegen` doc page](https://docs.subsquid.io/evm-indexing/squid-evm-typegen).
+
+## Deploy Kubernetes
+
+### 1. Make images
+Make `graphql` and `processor` images using docker.
+```bash
+docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest .
+docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest .
+```
+
+### 2. Push images
+Push the generated above images.
+```bash
+docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest
+docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest
+```
+
+### 3. Deploy instances
+Deploy the kubernetes instances.
+```bash
+## postrgres
+kubectl apply -f squid-postgres1.yaml
+## processor
+kubectl apply -f squid-processor1.yaml
+## graphql
+kubectl apply -f squid-graphql.yaml
+```
+After that check the instances in the [google cloud console page](https://console.cloud.google.com/kubernetes/workload/overview?project=stu-dashboard-a0ba2&orgonly=true&supportedpurview=organizationId)
 
 ## Project conventions
 

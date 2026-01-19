@@ -17,12 +17,12 @@ spec:
     spec:
       containers:
       - name: graphql
-        image: us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql:latest
+        image: us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest
         ports:
         - containerPort: 4350
         env:
         - name: DB_HOST
-          value: squid-postgres
+          value: squid-postgres1
         - name: DB_PORT
           value: "5432"
         - name: DB_USER
