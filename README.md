@@ -93,7 +93,7 @@ See more details on the [`squid-evm-typegen` doc page](https://docs.subsquid.io/
 ### 1. Make images
 Make `graphql` and `processor` images using docker.
 ```bash
-docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest .
+docker build -f Dockerfile.processor -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest .
 docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest .
 ```
 
