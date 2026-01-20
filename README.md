@@ -93,24 +93,24 @@ See more details on the [`squid-evm-typegen` doc page](https://docs.subsquid.io/
 ### 1. Make images
 Make `graphql` and `processor` images using docker.
 ```bash
-docker build -f Dockerfile.processor -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest .
-docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest .
+docker build -f Dockerfile.processor -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor:latest .
+docker build -f Dockerfile.graphql -t us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql:latest .
 ```
 
 ### 2. Push images
 Push the generated above images.
 ```bash
-docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor1:latest
-docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql1:latest
+docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/processor:latest
+docker push us-docker.pkg.dev/stu-dashboard-a0ba2/taofi-squid/graphql:latest
 ```
 
 ### 3. Deploy instances
 Deploy the kubernetes instances.
 ```bash
 ## postrgres
-kubectl apply -f squid-postgres1.yaml
+kubectl apply -f squid-postgres.yaml
 ## processor
-kubectl apply -f squid-processor1.yaml
+kubectl apply -f squid-processor.yaml
 ## graphql
 kubectl apply -f squid-graphql.yaml
 ```
